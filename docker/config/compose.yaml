@@ -1,7 +1,10 @@
 services:
   dev:
     build:
-      context: .
+      # compose.yaml は docker/config/ 配下にあるが、Dockerfile やそこから
+      # COPY される scripts/ は docker/ 直下(1階層上)にあるため、
+      # ビルドコンテキストを一つ上に指定する。
+      context: ..
       dockerfile: Dockerfile
       args:
         USER_UID: ${USER_UID:-1000}
@@ -30,16 +33,24 @@ services:
       # nvm/cargo/rustup 等ビルド時にイメージへ焼き込んだツールチェーンを
       # 空のホスト側ディレクトリで上書きしてしまうのを避けるため
       # (詳細は README.md の「認証情報・設定の永続化」参照)。
-      # ~/.jcode: jcode login の認証情報 (auth.json 等)
-      - ${WSL_JCODE_HOME}:/home/developer/.jcode
+      # ~/.jcode-data ($JCODE_HOME): jcode login の認証情報 (auth.json 等)。
+      # jcode の実行ファイル本体は ~/.jcode/builds/... に焼き込まれているため、
+      # ~/.jcode をそのままマウントすると隠れてしまう。JCODE_HOME(Dockerfile で
+      # ~/.jcode-data に設定済み)経由で認証情報だけを分離してマウントする
+      # (詳細は docs/TROUBLESHOOTING.md 参照)。
+      - ${WSL_JCODE_HOME}:/home/developer/.jcode-data
       # ~/.config/gh: gh auth login の認証情報
       - ${WSL_GH_CONFIG_HOME}:/home/developer/.config/gh
       # ~/.claude: Claude Code CLI の認証情報 (.credentials.json 等)
       - ${WSL_CLAUDE_HOME}:/home/developer/.claude
       # ~/.ssh: SSH 鍵 (git 等での鍵認証に使用)
       - ${WSL_SSH_HOME}:/home/developer/.ssh
-      # ~/.gitconfig: git のユーザー設定 (ファイルマウント。事前に
-      # ホスト側ファイルを touch で作成しておくこと。README.md 参照)
-      - ${WSL_GITCONFIG_FILE}:/home/developer/.gitconfig
+      # ~/.config/git: git のユーザー設定 (ディレクトリマウント)。
+      # ~/.gitconfig をファイル単体でマウントすると、gh auth login 等が
+      # 設定書き込み時に rename でファイルを置き換えようとして
+      # "Device or resource busy" になるため、XDG 準拠のディレクトリ
+      # (~/.config/git/config も git のグローバル設定として読まれる)を
+      # マウントすることでこれを回避している。
+      - ${WSL_GIT_CONFIG_HOME}:/home/developer/.config/git
       # ~/.npmrc: npm の認証・レジストリ設定 (ファイルマウント。同上)
       - ${WSL_NPMRC_FILE}:/home/developer/.npmrc

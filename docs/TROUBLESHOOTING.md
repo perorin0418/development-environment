@@ -1,5 +1,25 @@
 # トラブルシューティング
 
+## コンテナ内で `jcode: command not found` になる
+
+**原因**: jcode の実行ファイル本体は `~/.jcode/builds/...` に配置され、
+`~/.local/bin/jcode` はそこへのシンボリックリンクに過ぎない。以前の
+`compose.yaml` は `~/.jcode` を丸ごとバインドマウントしていたため、イメージ
+ビルド時に焼き込んだ `builds/` がホスト側の空ディレクトリで隠れてしまい、
+シンボリックリンクの参照先が存在しない状態になっていた。
+
+**対処**: jcode は認証情報等の保存先を `JCODE_HOME` 環境変数で変更できる。
+本リポジトリでは Dockerfile で `JCODE_HOME=/home/developer/.jcode-data` を
+設定し、`compose.yaml` も `WSL_JCODE_HOME` のマウント先を
+`/home/developer/.jcode-data` に変更済み。認証情報 (`auth.json` 等) は
+`~/.jcode-data` 側に永続化され、`~/.jcode`(バイナリ本体)はイメージに
+焼き込んだまま保たれる。
+
+既に古い設定で `~/.jcode` をマウントしたまま運用していた場合は、
+`docker\config\.env` の `WSL_JCODE_HOME` はそのままで構わない(マウント先の変更は
+`compose.yaml` 側で行うため)。`docker compose up -d --build` でイメージと
+コンテナを作り直せば解消する。
+
 ## `exec-dev-container.bat` が `The dev-container is not running.` と出る
 
 `docker compose ps` でコンテナが `Restarting` を繰り返していないか確認する
@@ -33,7 +53,7 @@ docker logs --tail 50 dev-container
 なっているが、古い `.env` を使い回している場合や手動でパスを書き換えた場合に
 発生し得る)。
 
-**対処**: `docker\.env` を開き、`WSL_MOUNT_SOURCE` などのパスを
+**対処**: `docker\config\.env` を開き、`WSL_MOUNT_SOURCE` などのパスを
 `$HOME/workspace/...`(WSL Debian 側の自分のホームディレクトリ配下)のような
 書き込み権限のある場所に書き換えてから、`setup-dev-container.bat` を再実行する。
 `.env` は docker compose がそのまま読むファイルのため `$HOME` は展開されない。

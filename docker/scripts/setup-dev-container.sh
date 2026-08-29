@@ -19,7 +19,7 @@ log() {
     echo "[setup] $*"
 }
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../config" && pwd)"
 cd "${SCRIPT_DIR}"
 
 log "Disabling docker credential helper (credsStore=none)..."
@@ -71,9 +71,9 @@ DIRS=(
     "${WSL_GH_CONFIG_HOME:-}"
     "${WSL_CLAUDE_HOME:-}"
     "${WSL_SSH_HOME:-}"
+    "${WSL_GIT_CONFIG_HOME:-}"
 )
 FILES=(
-    "${WSL_GITCONFIG_FILE:-}"
     "${WSL_NPMRC_FILE:-}"
 )
 

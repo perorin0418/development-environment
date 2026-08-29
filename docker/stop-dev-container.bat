@@ -27,7 +27,7 @@ if errorlevel 1 (
 )
 
 echo [INFO] Running "docker compose down" inside WSL Debian...
-wsl.exe -d %DISTRO% -- bash -lc "cd \"$(wslpath -a '%SCRIPT_DIR%')\" && docker compose down"
+wsl.exe -d %DISTRO% -- bash -lc "cd \"$(wslpath -a '%SCRIPT_DIR%config')\" && docker compose down"
 if errorlevel 1 (
     echo [ERROR] docker compose down failed. See the log above.
     set "RESULT=1"

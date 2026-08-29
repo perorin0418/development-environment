@@ -11,12 +11,30 @@ WSL Debian 側へバインドマウントする(`~/` 配下を丸ごとマウン
 
 | コンテナ内パス | 内容 | `.env` の変数 |
 | --- | --- | --- |
-| `~/.jcode` | `jcode login` の認証情報 (`auth.json` 等) | `WSL_JCODE_HOME` |
+| `~/.jcode-data` (`$JCODE_HOME`) | `jcode login` の認証情報 (`auth.json` 等) | `WSL_JCODE_HOME` |
 | `~/.config/gh` | `gh auth login` の認証情報 | `WSL_GH_CONFIG_HOME` |
 | `~/.claude` | Claude Code CLI の認証情報 (`.credentials.json` 等) | `WSL_CLAUDE_HOME` |
 | `~/.ssh` | SSH 鍵 | `WSL_SSH_HOME` |
-| `~/.gitconfig` | git のユーザー設定(ファイル) | `WSL_GITCONFIG_FILE` |
+| `~/.config/git` | git のユーザー設定(ディレクトリ) | `WSL_GIT_CONFIG_HOME` |
 | `~/.npmrc` | npm の認証・レジストリ設定(ファイル) | `WSL_NPMRC_FILE` |
+
+`~/.config/git` は `~/.gitconfig` をファイル単体でマウントするのではなく
+ディレクトリマウントにしている。`~/.gitconfig` をファイルとしてバインド
+マウントすると、`gh auth login` 等が設定書き込み時に一時ファイル作成 →
+rename で置き換えようとして `Device or resource busy` になるため
+(bind mount されたファイルは rename によるすり替えができない)。
+git はグローバル設定として `~/.gitconfig` が無ければ `~/.config/git/config`
+を読むため、ディレクトリ側をマウントすることで同じ書き込みパターンでも
+問題が起きないようにしている。
+
+`~/.jcode-data` を `~/.jcode` そのものではなく別ディレクトリにしているのは、
+jcode の実行ファイル本体(`~/.jcode/builds/...`、`~/.local/bin/jcode` から
+シンボリックリンクされている)がイメージビルド時に焼き込まれているため。
+`~/.jcode` を丸ごとバインドマウントすると、その `builds/` がホスト側の空
+ディレクトリで隠れて `jcode: command not found` になる。jcode は認証情報等の
+保存先ディレクトリを `JCODE_HOME` 環境変数で変更できるため、Dockerfile で
+`JCODE_HOME=/home/developer/.jcode-data` を設定し、認証情報だけをこちらに
+分離して永続化している。
 
 ## 事前準備
 

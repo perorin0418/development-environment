@@ -38,7 +38,7 @@ Rancher Desktop を開き、`Preferences > WSL > Integrations` で `Debian` を�
 行われます(何を作っているかは [docs/PERSISTENCE.md](./docs/PERSISTENCE.md) 参照)。
 実行中に WSL Debian のパスワード入力を求められることがあります。
 
-> 開発用ファイルを置く場所を変更したい場合は、`docker\.env` をテキストエディタで
+> 開発用ファイルを置く場所を変更したい場合は、`docker\config\.env` をテキストエディタで
 > 開いて `WSL_MOUNT_SOURCE` を書き換えてから、もう一度 `setup-dev-container.bat`
 > を実行してください(何度実行しても安全です)。
 
@@ -51,6 +51,10 @@ Rancher Desktop を開き、`Preferences > WSL > Integrations` で `Debian` を�
 
 同じフォルダーの **`exec-dev-container.bat`** をダブルクリックすると、
 コンテナ内のシェルに入れます。
+
+コンテナには GUI ブラウザが無いため、jcode に Claude でログインする際は
+`jcode login` ではなく `jcode-login-claude` を使います
+(詳細は [docs/JCODE_AUTH_LOGIN.md](./docs/JCODE_AUTH_LOGIN.md))。
 
 ---
 
@@ -73,4 +77,5 @@ Rancher Desktop を開き、`Preferences > WSL > Integrations` で `Debian` を�
 
 - [docs/BACKGROUND.md](./docs/BACKGROUND.md): なぜこの構成なのか、設計判断の理由
 - [docs/PERSISTENCE.md](./docs/PERSISTENCE.md): 認証情報・設定を永続化する仕組み
+- [docs/JCODE_AUTH_LOGIN.md](./docs/JCODE_AUTH_LOGIN.md): jcode にブラウザなしでログインする方法
 - [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md): 起動しない/エラーになる場合の対処

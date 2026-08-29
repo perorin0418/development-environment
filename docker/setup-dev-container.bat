@@ -5,7 +5,7 @@ rem ============================================================================
 rem setup-dev-container.bat
 rem
 rem One-time setup to run before start-dev-container.bat. Runs
-rem setup-dev-container.sh inside WSL Debian, which:
+rem scripts\setup-dev-container.sh inside WSL Debian, which:
 rem   - creates .env from .env.example if missing (defaults work out of the box)
 rem   - disables the docker credential helper (avoids known WSL PATH interop
 rem     issues, see ../docs/BACKGROUND.md)
@@ -29,7 +29,7 @@ if errorlevel 1 (
 
 echo [INFO] Running one-time setup inside WSL Debian...
 echo        (may ask for your WSL Debian password via sudo)
-wsl.exe -d %DISTRO% -- bash -lc "cd \"$(wslpath -a '%SCRIPT_DIR%')\" && bash setup-dev-container.sh"
+wsl.exe -d %DISTRO% -- bash -lc "cd \"$(wslpath -a '%SCRIPT_DIR%')\" && bash scripts/setup-dev-container.sh"
 if errorlevel 1 (
     echo [ERROR] Setup failed. See the log above.
     set "RESULT=1"

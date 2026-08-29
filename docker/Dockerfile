@@ -38,6 +38,16 @@ ENV DEBIAN_FRONTEND=noninteractive \
     RUSTUP_HOME=/home/${USERNAME}/.rustup \
     PATH=/home/${USERNAME}/.local/bin:/home/${USERNAME}/.cargo/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
+# jcode の実行ファイル本体(~/.jcode/builds/...)はイメージビルド時に焼き込まれる。
+# compose.yaml で ~/.jcode をそのままバインドマウントすると、その焼き込んだ
+# builds/ がホスト側の空ディレクトリで隠れてしまい、`jcode: command not found`
+# になる(~/.local/bin/jcode はシンボリックリンクで実体は ~/.jcode/builds 配下)。
+# jcode は認証情報等の保存先を JCODE_HOME で変更できるため、認証情報の永続化用
+# ディレクトリをバイナリの実体とは別の ~/.jcode-data に分離する。
+# 永続化対象は compose.yaml で ~/.jcode-data のみをマウントし、
+# ~/.jcode(builds 本体)はイメージに焼き込んだままにする。
+ENV JCODE_HOME=/home/${USERNAME}/.jcode-data
+
 # nvm/rustup/uv のインストーラースクリプトは bash 依存(dash非互換)のため、
 # 以降の RUN は bash で実行する。
 SHELL ["/bin/bash", "-c"]
@@ -151,8 +161,10 @@ RUN mkdir -p "${HOME}/.local/bin" \
     && ln -sf "${NODE_BIN_DIR}"/* "${HOME}/.local/bin/"
 
 # jcode の自動アップデートチェックを無効化(コンテナ内で毎起動チェックさせない)
-RUN mkdir -p "${HOME}/.jcode" \
-    && printf '[features]\ncheck_updates = false\n' > "${HOME}/.jcode/config.toml"
+# jcode は config.toml を ~/.jcode ではなく $JCODE_HOME から読むため、
+# JCODE_HOME(= ~/.jcode-data)側に書く。
+RUN mkdir -p "${JCODE_HOME}" \
+    && printf '[features]\ncheck_updates = false\n' > "${JCODE_HOME}/config.toml"
 
 # ---------------------------------------------------------------------------
 # 8. Python: uv
@@ -178,10 +190,21 @@ RUN mkdir -p "${HOME}/.local/bin" \
     && ln -sf "$(command -v fdfind)" "${HOME}/.local/bin/fd"
 
 # ---------------------------------------------------------------------------
+# 11b. jcode Claude ログイン用ヘルパー(ブラウザなし環境向け)
+# ---------------------------------------------------------------------------
+# コンテナには GUI ブラウザが無いため `jcode login` の通常の OAuth
+# ループバック認証は使えない。`docker exec -it dev-container jcode-login-claude`
+# で --no-browser 付きの login を呼び出せるようにしておく
+# (詳細はスクリプト内コメントおよび README.md 参照)。
+USER root
+COPY --chmod=0755 scripts/jcode-login-claude.sh /usr/local/bin/jcode-login-claude
+USER ${USERNAME}
+
+# ---------------------------------------------------------------------------
 # 12. entrypoint 設定
 # ---------------------------------------------------------------------------
 USER root
-COPY --chmod=0755 entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY --chmod=0755 scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 USER ${USERNAME}
 

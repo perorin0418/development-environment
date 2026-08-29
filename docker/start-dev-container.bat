@@ -18,10 +18,10 @@ set "DISTRO=Debian"
 set "SCRIPT_DIR=%~dp0"
 set "RESULT=0"
 
-if not exist "%SCRIPT_DIR%.env" (
-    echo [ERROR] %SCRIPT_DIR%.env not found.
-    echo         Copy .env.example to .env and set WSL_MOUNT_SOURCE etc.
-    echo         Example: copy .env.example .env
+if not exist "%SCRIPT_DIR%config\.env" (
+    echo [ERROR] %SCRIPT_DIR%config\.env not found.
+    echo         Copy config\.env.example to config\.env and set WSL_MOUNT_SOURCE etc.
+    echo         Example: copy config\.env.example config\.env
     set "RESULT=1"
     goto :end
 )
@@ -34,7 +34,7 @@ if errorlevel 1 (
 )
 
 echo [INFO] Running "docker compose up -d --build" inside WSL Debian...
-wsl.exe -d %DISTRO% -- bash -lc "cd \"$(wslpath -a '%SCRIPT_DIR%')\" && docker compose up -d --build"
+wsl.exe -d %DISTRO% -- bash -lc "cd \"$(wslpath -a '%SCRIPT_DIR%config')\" && docker compose up -d --build"
 if errorlevel 1 (
     echo [ERROR] docker compose up failed. See the log above.
     set "RESULT=1"

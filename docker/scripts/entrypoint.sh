@@ -23,15 +23,19 @@ log() {
 }
 
 # --- 永続化ボリュームの初期化 ---
-# compose.yaml で ~/.jcode 等をバインドマウントしている場合、初回は空の
+# compose.yaml で ~/.jcode-data 等をバインドマウントしている場合、初回は空の
 # ホスト側ディレクトリで上書きされ、イメージビルド時に焼き込んだデフォルト
 # 設定が隠れてしまう。マウント後にファイルが存在しなければ再生成する。
+#
+# jcode の実行ファイル本体(~/.jcode/builds/...)はイメージに焼き込んだままで、
+# バインドマウントの対象にしていない(JCODE_HOME=~/.jcode-data に認証情報等の
+# 永続化データだけを分離しているため。Dockerfile 参照)。
 
-# ~/.jcode: check_updates=false のデフォルト設定を再生成
-JCODE_CONFIG_FILE="${HOME}/.jcode/config.toml"
+# ~/.jcode-data ($JCODE_HOME): check_updates=false のデフォルト設定を再生成
+JCODE_CONFIG_FILE="${JCODE_HOME:-${HOME}/.jcode-data}/config.toml"
 if [ ! -f "${JCODE_CONFIG_FILE}" ]; then
     log "Initializing ${JCODE_CONFIG_FILE} (first run on this persisted volume)"
-    mkdir -p "${HOME}/.jcode"
+    mkdir -p "$(dirname "${JCODE_CONFIG_FILE}")"
     printf '[features]\ncheck_updates = false\n' > "${JCODE_CONFIG_FILE}"
 fi
 
