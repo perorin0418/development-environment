@@ -22,6 +22,28 @@ log() {
     echo "[entrypoint] $*"
 }
 
+# --- 永続化ボリュームの初期化 ---
+# compose.yaml で ~/.jcode 等をバインドマウントしている場合、初回は空の
+# ホスト側ディレクトリで上書きされ、イメージビルド時に焼き込んだデフォルト
+# 設定が隠れてしまう。マウント後にファイルが存在しなければ再生成する。
+
+# ~/.jcode: check_updates=false のデフォルト設定を再生成
+JCODE_CONFIG_FILE="${HOME}/.jcode/config.toml"
+if [ ! -f "${JCODE_CONFIG_FILE}" ]; then
+    log "Initializing ${JCODE_CONFIG_FILE} (first run on this persisted volume)"
+    mkdir -p "${HOME}/.jcode"
+    printf '[features]\ncheck_updates = false\n' > "${JCODE_CONFIG_FILE}"
+fi
+
+# ~/.ssh: sshd/ssh クライアントはディレクトリ・鍵ファイルのパーミッションが
+# 緩いと使用を拒否するため、バインドマウント後(ホスト側 WSL のパーミッションが
+# そのまま反映される)に毎回強制し直す。
+if [ -d "${HOME}/.ssh" ]; then
+    chmod 700 "${HOME}/.ssh"
+    find "${HOME}/.ssh" -maxdepth 1 -type f -name '*.pub' -exec chmod 644 {} +
+    find "${HOME}/.ssh" -maxdepth 1 -type f ! -name '*.pub' -exec chmod 600 {} +
+fi
+
 # --- code-server ---
 if [ "${START_CODE_SERVER:-false}" = "true" ]; then
     log "Starting code-server"

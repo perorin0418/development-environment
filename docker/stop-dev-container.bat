@@ -4,12 +4,15 @@ setlocal enabledelayedexpansion
 rem ============================================================================
 rem stop-dev-container.bat
 rem
-rem Stops the dev container by running "docker compose stop" from inside the
+rem Removes the dev container by running "docker compose down" from inside the
 rem WSL Debian distribution.
 rem
-rem The container and its network are kept (not removed), so it can be
-rem resumed with start-dev-container.bat. To remove the container entirely,
-rem run "docker compose down" inside the WSL Debian shell.
+rem The container itself is deleted (the image is kept), so restarting it with
+rem start-dev-container.bat will recreate it from scratch. This is safe:
+rem project files (WSL_MOUNT_SOURCE) and credentials/config (WSL_JCODE_HOME,
+rem WSL_GH_CONFIG_HOME, WSL_CLAUDE_HOME, WSL_SSH_HOME, WSL_GITCONFIG_FILE,
+rem WSL_NPMRC_FILE) are bind-mounted from WSL Debian and are not affected by
+rem "docker compose down" (see ../docs/PERSISTENCE.md).
 rem ============================================================================
 
 set "DISTRO=Debian"
@@ -23,16 +26,16 @@ if errorlevel 1 (
     goto :end
 )
 
-echo [INFO] Running "docker compose stop" inside WSL Debian...
-wsl.exe -d %DISTRO% -- bash -lc "cd \"$(wslpath -a '%SCRIPT_DIR%')\" && docker compose stop"
+echo [INFO] Running "docker compose down" inside WSL Debian...
+wsl.exe -d %DISTRO% -- bash -lc "cd \"$(wslpath -a '%SCRIPT_DIR%')\" && docker compose down"
 if errorlevel 1 (
-    echo [ERROR] docker compose stop failed. See the log above.
+    echo [ERROR] docker compose down failed. See the log above.
     set "RESULT=1"
     goto :end
 )
 
 echo.
-echo [INFO] Stopped. Run start-dev-container.bat to resume.
+echo [INFO] Removed. Run start-dev-container.bat to recreate and start again.
 
 :end
 echo.
