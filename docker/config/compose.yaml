@@ -54,3 +54,5 @@ services:
       - ${WSL_GIT_CONFIG_HOME}:/home/developer/.config/git
       # ~/.npmrc: npm の認証・レジストリ設定 (ファイルマウント。同上)
       - ${WSL_NPMRC_FILE}:/home/developer/.npmrc
+      # ~/.aws: AWS CLI の認証情報・設定 (credentials, config 等)
+      - ${WSL_AWS_HOME}:/home/developer/.aws
