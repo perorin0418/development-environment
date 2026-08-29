@@ -54,3 +54,7 @@ services:
       - ${WSL_GIT_CONFIG_HOME}:/home/developer/.config/git
       # ~/.npmrc: npm の認証・レジストリ設定 (ファイルマウント。同上)
       - ${WSL_NPMRC_FILE}:/home/developer/.npmrc
+      # ~/.config/herdr: herdr の設定・セッション状態 (config.toml, session.json 等)
+      - ${WSL_HERDR_CONFIG_HOME}:/home/developer/.config/herdr
+      # ~/.local/state/herdr: herdr のエージェント検出状態 (agent-detection/ 配下)
+      - ${WSL_HERDR_STATE_HOME}:/home/developer/.local/state/herdr

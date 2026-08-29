@@ -17,6 +17,8 @@ WSL Debian 側へバインドマウントする(`~/` 配下を丸ごとマウン
 | `~/.ssh` | SSH 鍵 | `WSL_SSH_HOME` |
 | `~/.config/git` | git のユーザー設定(ディレクトリ) | `WSL_GIT_CONFIG_HOME` |
 | `~/.npmrc` | npm の認証・レジストリ設定(ファイル) | `WSL_NPMRC_FILE` |
+| `~/.config/herdr` | herdr の設定・セッション状態(`config.toml`, `session.json` 等) | `WSL_HERDR_CONFIG_HOME` |
+| `~/.local/state/herdr` | herdr のエージェント検出状態(`agent-detection/` 配下) | `WSL_HERDR_STATE_HOME` |
 
 `~/.config/git` は `~/.gitconfig` をファイル単体でマウントするのではなく
 ディレクトリマウントにしている。`~/.gitconfig` をファイルとしてバインド
