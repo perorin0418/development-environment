@@ -1,0 +1,45 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+    image: dev-container:latest
+    container_name: dev-container
+    # 常に起動し続ける: コンテナが(異常終了・OS再起動後の Docker 起動などで)
+    # 停止しても Docker により自動的に再起動される。
+    restart: always
+    # Dockerfile の CMD ("sleep infinity") をそのままフォアグラウンドプロセスとして
+    # 動かし続けることで、コンテナを常駐させる。
+    ports:
+      # コンテナへの接続は `docker exec -it dev-container bash` を使う
+      # (SSH ポートは公開しない。README.md 参照)。
+      - "8153:8153"
+    environment:
+      START_CODE_SERVER: "true"
+      START_JCODE: "true"
+      START_HERDR: "true"
+    volumes:
+      # WSL Debian 側のディレクトリ(ext4)を /workspace にマウントする。
+      # WSL_MOUNT_SOURCE は .env で指定する(WSL Debian のネイティブパス)。
+      - ${WSL_MOUNT_SOURCE}:/workspace
+      # 以下は認証情報・設定を含むディレクトリ/ファイルを WSL Debian 側に
+      # 個別に永続化するためのマウント。HOME 配下を丸ごとマウントしないのは、
+      # nvm/cargo/rustup 等ビルド時にイメージへ焼き込んだツールチェーンを
+      # 空のホスト側ディレクトリで上書きしてしまうのを避けるため
+      # (詳細は README.md の「認証情報・設定の永続化」参照)。
+      # ~/.jcode: jcode login の認証情報 (auth.json 等)
+      - ${WSL_JCODE_HOME}:/home/developer/.jcode
+      # ~/.config/gh: gh auth login の認証情報
+      - ${WSL_GH_CONFIG_HOME}:/home/developer/.config/gh
+      # ~/.claude: Claude Code CLI の認証情報 (.credentials.json 等)
+      - ${WSL_CLAUDE_HOME}:/home/developer/.claude
+      # ~/.ssh: SSH 鍵 (git 等での鍵認証に使用)
+      - ${WSL_SSH_HOME}:/home/developer/.ssh
+      # ~/.gitconfig: git のユーザー設定 (ファイルマウント。事前に
+      # ホスト側ファイルを touch で作成しておくこと。README.md 参照)
+      - ${WSL_GITCONFIG_FILE}:/home/developer/.gitconfig
+      # ~/.npmrc: npm の認証・レジストリ設定 (ファイルマウント。同上)
+      - ${WSL_NPMRC_FILE}:/home/developer/.npmrc
