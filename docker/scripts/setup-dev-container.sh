@@ -72,6 +72,7 @@ DIRS=(
     "${WSL_CLAUDE_HOME:-}"
     "${WSL_SSH_HOME:-}"
     "${WSL_GIT_CONFIG_HOME:-}"
+    "${WSL_AWS_HOME:-}"
     "${WSL_HERDR_CONFIG_HOME:-}"
     "${WSL_HERDR_STATE_HOME:-}"
 )

@@ -117,6 +117,47 @@ RUN GO_ARCH="$(dpkg --print-architecture)" \
     && rm -f "/tmp/${GO_TARBALL}"
 
 # ---------------------------------------------------------------------------
+# 4b. AWS CLI v2 (公式インストーラー)
+# ---------------------------------------------------------------------------
+RUN AWS_ARCH="$(dpkg --print-architecture)" \
+    && case "${AWS_ARCH}" in \
+         amd64) AWS_CLI_ARCH="x86_64" ;; \
+         arm64) AWS_CLI_ARCH="aarch64" ;; \
+         *) echo "Unsupported architecture for AWS CLI: ${AWS_ARCH}" >&2; exit 1 ;; \
+       esac \
+    && curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-${AWS_CLI_ARCH}.zip" -o /tmp/awscliv2.zip \
+    && unzip -q /tmp/awscliv2.zip -d /tmp \
+    && /tmp/aws/install \
+    && rm -rf /tmp/awscliv2.zip /tmp/aws
+
+# ---------------------------------------------------------------------------
+# 4c. AWS SAM CLI (公式インストーラー)
+# ---------------------------------------------------------------------------
+RUN SAM_ARCH="$(dpkg --print-architecture)" \
+    && case "${SAM_ARCH}" in \
+         amd64) SAM_CLI_ARCH="x86_64" ;; \
+         arm64) SAM_CLI_ARCH="arm64" ;; \
+         *) echo "Unsupported architecture for AWS SAM CLI: ${SAM_ARCH}" >&2; exit 1 ;; \
+       esac \
+    && curl -fsSL "https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-${SAM_CLI_ARCH}.zip" -o /tmp/aws-sam-cli.zip \
+    && unzip -q /tmp/aws-sam-cli.zip -d /tmp/sam-installation \
+    && /tmp/sam-installation/install \
+    && rm -rf /tmp/aws-sam-cli.zip /tmp/sam-installation
+
+# ---------------------------------------------------------------------------
+# 4d. Terraform (HashiCorp apt リポジトリ)
+# ---------------------------------------------------------------------------
+RUN mkdir -p -m 755 /etc/apt/keyrings \
+    && curl -fsSL https://apt.releases.hashicorp.com/gpg \
+        | gpg --dearmor -o /etc/apt/keyrings/hashicorp-archive-keyring.gpg \
+    && chmod go+r /etc/apt/keyrings/hashicorp-archive-keyring.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" \
+        > /etc/apt/sources.list.d/hashicorp.list \
+    && apt-get update -y \
+    && apt-get install -y --no-install-recommends terraform \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---------------------------------------------------------------------------
 # 5. 非rootユーザー
 # ---------------------------------------------------------------------------
 # WSL Debian 側のディレクトリをボリュームマウントした際にファイル所有権が
@@ -155,7 +196,7 @@ RUN curl -o- "https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/instal
 # 起動時に固定された ~/.local/bin へシンボリックリンクしておく。
 RUN mkdir -p "${HOME}/.local/bin" \
     && . "${NVM_DIR}/nvm.sh" \
-    && npm install -g pnpm @vue/cli @anthropic-ai/claude-code \
+    && npm install -g pnpm @vue/cli @anthropic-ai/claude-code aws-cdk \
     && curl -fsSL https://herdr.dev/install.sh | sh \
     && curl -fsSL https://jcode.sh/install | bash \
     && NODE_BIN_DIR="$(dirname "$(nvm which default)")" \
