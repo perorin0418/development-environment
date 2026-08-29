@@ -56,3 +56,7 @@ services:
       - ${WSL_NPMRC_FILE}:/home/developer/.npmrc
       # ~/.aws: AWS CLI の認証情報・設定 (credentials, config 等)
       - ${WSL_AWS_HOME}:/home/developer/.aws
+      # ~/.config/herdr: herdr の設定・セッション状態 (config.toml, session.json 等)
+      - ${WSL_HERDR_CONFIG_HOME}:/home/developer/.config/herdr
+      # ~/.local/state/herdr: herdr のエージェント検出状態 (agent-detection/ 配下)
+      - ${WSL_HERDR_STATE_HOME}:/home/developer/.local/state/herdr
