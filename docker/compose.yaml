@@ -1,0 +1,27 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+    image: dev-container:latest
+    container_name: dev-container
+    # 常に起動し続ける: コンテナが(異常終了・OS再起動後の Docker 起動などで)
+    # 停止しても Docker により自動的に再起動される。
+    restart: always
+    # Dockerfile の CMD ("sleep infinity") をそのままフォアグラウンドプロセスとして
+    # 動かし続けることで、コンテナを常駐させる。
+    ports:
+      # コンテナへの接続は `docker exec -it dev-container bash` を使う
+      # (SSH ポートは公開しない。README.md 参照)。
+      - "8153:8153"
+    environment:
+      START_CODE_SERVER: "true"
+      START_JCODE: "true"
+      START_HERDR: "true"
+    volumes:
+      # WSL Debian 側のディレクトリ(ext4)を /workspace にマウントする。
+      # WSL_MOUNT_SOURCE は .env で指定する(WSL Debian のネイティブパス)。
+      - ${WSL_MOUNT_SOURCE}:/workspace
