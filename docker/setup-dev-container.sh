@@ -28,8 +28,16 @@ DOCKER_CONFIG_FILE="${HOME}/.docker/config.json"
 if [ ! -f "${DOCKER_CONFIG_FILE}" ]; then
     # 新規作成: そのまま書き込んでよい。
     printf '{\n  "credsStore": "none"\n}\n' > "${DOCKER_CONFIG_FILE}"
+elif grep -Eq '"credsStore"[[:space:]]*:[[:space:]]*"none"' "${DOCKER_CONFIG_FILE}"; then
+    log "  -> ${DOCKER_CONFIG_FILE} already has credsStore=none, leaving it untouched."
 elif grep -q '"credsStore"' "${DOCKER_CONFIG_FILE}"; then
-    log "  -> ${DOCKER_CONFIG_FILE} already has credsStore, leaving it untouched."
+    # Rancher Desktop の WSL Integration 再有効化などで credsStore が
+    # wincred.exe 等(Windows 用バイナリ)に書き戻されることがある。
+    # Windows PATH interop により Linux 側から実行できず exec format error に
+    # なるため、値を強制的に none へ上書きする。
+    log "  -> ${DOCKER_CONFIG_FILE} has a non-none credsStore, forcing it to none."
+    cp "${DOCKER_CONFIG_FILE}" "${DOCKER_CONFIG_FILE}.bak"
+    sed -i -E 's/"credsStore"[[:space:]]*:[[:space:]]*"[^"]*"/"credsStore": "none"/' "${DOCKER_CONFIG_FILE}"
 else
     # 既存ファイル(Rancher Desktop が書き込んだ cliPluginsExtraDirs 等)を
     # 壊さないよう、丸ごと上書きはせず先頭の "{" の直後に1行だけ追記する。
@@ -41,7 +49,9 @@ fi
 
 if [ ! -f .env ]; then
     log "Creating .env from .env.example (using defaults)..."
-    cp .env.example .env
+    # .env.example の $HOME は実際のホームディレクトリへ展開しておく
+    # (docker compose の .env ファイルはシェル変数展開をサポートしないため)。
+    sed "s|\$HOME|${HOME}|g" .env.example > .env
 else
     log ".env already exists, keeping it as-is."
 fi
