@@ -25,6 +25,21 @@ docker logs --tail 50 dev-container
 **対処**: `setup-dev-container.bat` を実行して所有権を直してから、
 `stop-dev-container.bat` → `start-dev-container.bat` の順に実行してください。
 
+## `setup-dev-container.bat` で `mkdir: cannot create directory '/workspace': Permission denied` が出る
+
+**原因**: `.env` の `WSL_MOUNT_SOURCE` 等が `/workspace` のように WSL Debian の
+ルート直下(root 所有)を指すパスになっている。一般ユーザーは root 所有ディレクトリ
+配下に `mkdir`/`chown` できないため失敗する(既定値は `$HOME/workspace/...` に
+なっているが、古い `.env` を使い回している場合や手動でパスを書き換えた場合に
+発生し得る)。
+
+**対処**: `docker\.env` を開き、`WSL_MOUNT_SOURCE` などのパスを
+`$HOME/workspace/...`(WSL Debian 側の自分のホームディレクトリ配下)のような
+書き込み権限のある場所に書き換えてから、`setup-dev-container.bat` を再実行する。
+`.env` は docker compose がそのまま読むファイルのため `$HOME` は展開されない。
+WSL Debian のシェルで `echo $HOME` を実行して実際のパス(例: `/home/ユーザー名`)
+に置き換えること。
+
 ## `docker build`/`docker compose up` で credential helper エラーが出る
 
 `docker-credential-wincred.exe: exec format error` や
