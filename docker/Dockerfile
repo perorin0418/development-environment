@@ -69,6 +69,7 @@ RUN apt-get update -y \
         unzip \
         openssh-client \
         procps \
+        less \
         ripgrep \
         jq \
         python3 \
