@@ -78,6 +78,7 @@ DIRS=(
 )
 FILES=(
     "${WSL_NPMRC_FILE:-}"
+    "${WSL_AGENTS_MD_FILE:-}"
 )
 
 for d in "${DIRS[@]}"; do
