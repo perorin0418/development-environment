@@ -2,11 +2,6 @@
 --
 -- 自動補完エンジン: nvim-cmp
 -- 参考: https://zenn.dev/forcia_tech/articles/202411_deguchi_neovim
---
--- Copilot 由来の補完ソース ("copilot") は copilot.lua (lua/plugins/copilot.lua)
--- によって提供される。LSP の補完が邪魔して Copilot が出ないのも、Copilot の
--- 補完が邪魔して buffer の補完が出ないのも困るため、参考記事同様 group 化はせず
--- 単純にソースを列挙している。
 return {
   {
     "hrsh7th/nvim-cmp",
@@ -25,7 +20,6 @@ return {
           ["<CR>"] = cmp.mapping.confirm({ select = true }),
         }),
         sources = cmp.config.sources({
-          { name = "copilot" },
           { name = "nvim_lsp" },
         }, {
           { name = "buffer" },
