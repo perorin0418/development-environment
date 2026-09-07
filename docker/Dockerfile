@@ -70,6 +70,7 @@ RUN apt-get update -y \
         openssh-client \
         procps \
         less \
+        vim \
         ripgrep \
         jq \
         python3 \
@@ -82,6 +83,7 @@ RUN apt-get update -y \
         fd-find \
         locales \
         fonts-noto-cjk \
+        xclip \
     && rm -rf /var/lib/apt/lists/*
 
 # ---------------------------------------------------------------------------
@@ -159,6 +161,26 @@ RUN mkdir -p -m 755 /etc/apt/keyrings \
     && rm -rf /var/lib/apt/lists/*
 
 # ---------------------------------------------------------------------------
+# 4e. Neovim (公式リリースの最新安定版 tarball)
+# ---------------------------------------------------------------------------
+# Debian の apt にある neovim パッケージ (bookworm 時点で 0.7 系) は古く、
+# 後述のプラグイン (lazy.nvim, telescope.nvim, nvim-lspconfig 等) が要求する
+# 最新安定版の機能を満たせないため、公式ビルド済み tarball を /opt/nvim に
+# 展開し、シンボリックリンクで /usr/local/bin/nvim から参照する。
+RUN NVIM_ARCH="$(dpkg --print-architecture)" \
+    && case "${NVIM_ARCH}" in \
+         amd64) NVIM_TARBALL_ARCH="x86_64" ;; \
+         arm64) NVIM_TARBALL_ARCH="arm64" ;; \
+         *) echo "Unsupported architecture for Neovim: ${NVIM_ARCH}" >&2; exit 1 ;; \
+       esac \
+    && curl -fsSL "https://github.com/neovim/neovim/releases/latest/download/nvim-linux-${NVIM_TARBALL_ARCH}.tar.gz" \
+        -o /tmp/nvim.tar.gz \
+    && tar -C /opt -xzf /tmp/nvim.tar.gz \
+    && rm -f /tmp/nvim.tar.gz \
+    && mv "/opt/nvim-linux-${NVIM_TARBALL_ARCH}" /opt/nvim \
+    && ln -sf /opt/nvim/bin/nvim /usr/local/bin/nvim
+
+# ---------------------------------------------------------------------------
 # 5. 非rootユーザー
 # ---------------------------------------------------------------------------
 # WSL Debian 側のディレクトリをボリュームマウントした際にファイル所有権が
@@ -208,6 +230,18 @@ RUN mkdir -p "${HOME}/.local/bin" \
 # JCODE_HOME(= ~/.jcode-data)側に書く。
 RUN mkdir -p "${JCODE_HOME}" \
     && printf '[features]\ncheck_updates = false\n' > "${JCODE_HOME}/config.toml"
+
+# ---------------------------------------------------------------------------
+# 7b. Neovim 設定 (lazy.nvim + プラグイン群)
+# ---------------------------------------------------------------------------
+# 参考: https://zenn.dev/forcia_tech/articles/202411_deguchi_neovim
+# config/nvim/ 配下の設定一式 (init.lua, lua/config/lazy.lua, lua/plugins/*.lua)
+# を ~/.config/nvim にそのまま配置する。プラグイン本体はビルド時に
+# `nvim --headless "+Lazy! sync" +qa` で事前インストールしておくことで、
+# コンテナ起動後の初回 nvim 起動時にダウンロード待ちが発生しないようにする。
+COPY --chown=${USERNAME}:${USERNAME} config/nvim/ "${HOME}/.config/nvim/"
+RUN nvim --headless "+Lazy! sync" +qa || true \
+    && nvim --headless "+Lazy! sync" +qa
 
 # ---------------------------------------------------------------------------
 # 8. Python: uv
