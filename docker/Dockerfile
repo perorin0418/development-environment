@@ -110,6 +110,19 @@ RUN mkdir -p -m 755 /etc/apt/keyrings \
     && rm -rf /var/lib/apt/lists/*
 
 # ---------------------------------------------------------------------------
+# 3b. glow (Markdown を CLI で読むためのビューア, Charm 公式 apt リポジトリ)
+# ---------------------------------------------------------------------------
+RUN mkdir -p -m 755 /etc/apt/keyrings \
+    && curl -fsSL https://repo.charm.sh/apt/gpg.key \
+        | gpg --dearmor -o /etc/apt/keyrings/charm.gpg \
+    && chmod go+r /etc/apt/keyrings/charm.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" \
+        > /etc/apt/sources.list.d/charm.list \
+    && apt-get update -y \
+    && apt-get install -y --no-install-recommends glow \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---------------------------------------------------------------------------
 # 4. Go (latest stable, official tarball)
 # ---------------------------------------------------------------------------
 RUN GO_ARCH="$(dpkg --print-architecture)" \
