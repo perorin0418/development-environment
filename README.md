@@ -56,6 +56,10 @@ Rancher Desktop を開き、`Preferences > WSL > Integrations` で `Debian` を�
 `jcode login` ではなく `jcode-login-claude` を使います
 (詳細は [docs/JCODE_AUTH_LOGIN.md](./docs/JCODE_AUTH_LOGIN.md))。
 
+コンテナ内では `docker` コマンドがそのまま使えます(ホスト側 Rancher Desktop
+の Docker デーモンを操作します。詳細は [docs/BACKGROUND.md](./docs/BACKGROUND.md)
+の「コンテナ内から `docker` コマンドを使う」参照)。
+
 ---
 
 ## よく使う操作(すべて `create-dockerfile\docker` フォルダー内)

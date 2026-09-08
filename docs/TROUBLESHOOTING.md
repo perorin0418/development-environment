@@ -73,3 +73,32 @@ libsecret-1.so.0` が出る場合は、[BACKGROUND.md](./BACKGROUND.md) の
 Rancher Desktop の既知の制限。Windows の PowerShell から直接実行せず、
 WSL Debian のシェルに入ってネイティブパスで実行すること。詳細は
 [BACKGROUND.md](./BACKGROUND.md) を参照。
+
+## コンテナ内で `docker` コマンドが `permission denied` になる/そもそも動かない
+
+まず WSL Debian 側で `/var/run/docker.sock` が存在するか確認する:
+
+```bash
+ls -l /var/run/docker.sock
+```
+
+**存在しない場合**: Rancher Desktop の `Preferences > WSL > Integrations` で
+`Debian` が有効になっているか確認する(手順2)。有効化直後は再起動が
+必要な場合がある。
+
+**存在するが権限エラーになる場合**: `entrypoint.sh` がコンテナ起動時に
+ソケットの GID に合わせてグループを自動作成し、`developer` ユーザーを
+追加する処理を行っている(詳細は
+[BACKGROUND.md](./BACKGROUND.md) の「コンテナ内から `docker` コマンドを
+使う」参照)。それでも失敗する場合は、コンテナ内で以下を実行してソケットの
+所有者/権限を確認する:
+
+```bash
+ls -l /var/run/docker.sock
+id
+```
+
+上記グループにユーザーが含まれていない場合は、一度
+`stop-dev-container.bat` → `start-dev-container.bat` でコンテナを再作成する
+(`entrypoint.sh` は毎起動時にグループ調整を行うため、多くの場合これで解消する)。
+

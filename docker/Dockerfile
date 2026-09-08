@@ -17,10 +17,11 @@
 #         子プロセスとして直接管理する(systemd は使わない)。
 #   - Docker Engine (docker-ce 一式)
 #       → コンテナランタイムはホスト側の Rancher Desktop が担う。
-#         コンテナ内で Docker-in-Docker を動かす必要はない想定のため除外。
-#         コンテナから docker コマンドを叩きたい場合は、本イメージに
-#         docker-ce-cli だけを追加し、ホストの docker ソケットを
-#         `-v /var/run/docker.sock:/var/run/docker.sock` でマウントする方式を検討すること。
+#         コンテナ内で Docker-in-Docker は動かさない。その代わり、
+#         docker-ce-cli(クライアントのみ)をインストールし、ホストの
+#         docker ソケットを compose.yaml 経由でバインドマウントすることで、
+#         コンテナ内から `docker` コマンドでホスト側の Docker を操作できる
+#         ようにしている(詳細は下記セクション 3c、および compose.yaml 参照)。
 #
 FROM debian:bookworm-slim
 
@@ -120,6 +121,25 @@ RUN mkdir -p -m 755 /etc/apt/keyrings \
         > /etc/apt/sources.list.d/charm.list \
     && apt-get update -y \
     && apt-get install -y --no-install-recommends glow \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---------------------------------------------------------------------------
+# 3c. docker-ce-cli (クライアントのみ。デーモンはホスト側 Rancher Desktop)
+# ---------------------------------------------------------------------------
+# コンテナ内から `docker` コマンドを使えるようにするため、Docker 公式 apt
+# リポジトリから docker-ce-cli(および docker compose v2 プラグイン)だけを
+# インストールする。docker-ce(デーモン本体)や containerd はインストールしない
+# (Docker-in-Docker は行わない方針。上記コメント参照)。
+# 実際にホストの Docker を操作するには、compose.yaml で
+# `/var/run/docker.sock` をコンテナにバインドマウントする必要がある。
+RUN mkdir -p -m 755 /etc/apt/keyrings \
+    && curl -fsSL https://download.docker.com/linux/debian/gpg \
+        | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
+    && chmod go+r /etc/apt/keyrings/docker.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" \
+        > /etc/apt/sources.list.d/docker.list \
+    && apt-get update -y \
+    && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin \
     && rm -rf /var/lib/apt/lists/*
 
 # ---------------------------------------------------------------------------

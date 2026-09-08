@@ -67,3 +67,34 @@ ripgrep, jq, gh, Python3+uv, Go, Java, Rust, fzf/fd-find, 日本語ロケール�
   サービス起動は `entrypoint.sh` が直接管理する。
 - **Docker Engine(docker-ce 一式)**: コンテナランタイムはホスト側の
   Rancher Desktop が担うため、コンテナ内に Docker-in-Docker は構築しない。
+  ただし、コンテナ内から `docker` コマンドを使いたいという要望に対応するため、
+  docker-ce-cli(クライアントのみ)は追加した。詳細は次節参照。
+
+## コンテナ内から `docker` コマンドを使う(ホストの Docker ソケットを共有)
+
+コンテナ内で Docker Engine 自体を動かす(Docker-in-Docker)のではなく、
+ホスト(Rancher Desktop)側の Docker デーモンをそのまま共有する方式にした。
+
+- **Dockerfile**: `docker-ce-cli` と `docker-compose-plugin`(クライアント側の
+  実行ファイルのみ)を Docker 公式 apt リポジトリからインストールする。
+  `docker-ce`(デーモン本体)や `containerd` はインストールしない。
+- **compose.yaml**: ホストの `/var/run/docker.sock` をコンテナの
+  `/var/run/docker.sock` へそのままバインドマウントする。Rancher Desktop は
+  WSL2 の内部 VM(`rancher-desktop` ディストリビューション)上で dockerd を
+  動かし、そのソケットを WSL Debian からも `/var/run/docker.sock` として
+  見える形で公開しているため、WSL Debian のシェルから `docker compose up` を
+  実行する限り、追加の設定なしにこのパスをそのままマウントできる。
+- **entrypoint.sh**: バインドマウントしたソケットの所有 GID はホスト
+  (Rancher Desktop 側 VM)の docker グループの GID であり、コンテナ内の
+  `developer` ユーザーの GID とは通常一致しない。そのため起動のたびにソケットの
+  GID を確認し、コンテナ内に同じ GID のグループを作成して `developer` を
+  追加してから残りの起動処理を `exec sg <group> -c ...` で再実行することで、
+  `sudo` なしで `docker` コマンドを使えるようにしている。
+
+この方式では、コンテナ内で作成したコンテナ・イメージ等はすべてホスト側の
+Docker デーモンの管理下に置かれる(コンテナの中に入れ子でコンテナが動くわけ
+ではない)。たとえばコンテナ内で `docker run` したコンテナのボリューム
+バインドマウントのソースパスは、コンテナ内から見えるパスではなく、ホスト
+(dockerd が動く Rancher Desktop VM)から見えるパスとして解釈される点に注意する。
+
+

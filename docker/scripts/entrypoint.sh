@@ -48,6 +48,34 @@ if [ -d "${HOME}/.ssh" ]; then
     find "${HOME}/.ssh" -maxdepth 1 -type f ! -name '*.pub' -exec chmod 600 {} +
 fi
 
+# --- ホスト Docker ソケット ---
+# compose.yaml で /var/run/docker.sock をバインドマウントしている場合、
+# ソケットの所有 GID はホスト(Rancher Desktop の VM)側の docker グループの
+# GID であり、コンテナ内の developer ユーザーとは通常一致しない。そのため
+# 起動のたびにソケットの GID を確認し、コンテナ内に同じ GID のグループを
+# 用意して developer を所属させ、以後 sudo なしで `docker` コマンドを
+# 使えるようにする(既存の docker グループの GID とホスト側が異なる場合は
+# 作り直す)。ソケットが無い(バインドマウントしていない)場合は何もしない。
+DOCKER_SOCK="/var/run/docker.sock"
+if [ -S "${DOCKER_SOCK}" ]; then
+    SOCK_GID="$(stat -c '%g' "${DOCKER_SOCK}")"
+    EXISTING_GROUP="$(getent group "${SOCK_GID}" | cut -d: -f1 || true)"
+    if [ -z "${EXISTING_GROUP}" ]; then
+        log "Creating group 'docker-host' (gid ${SOCK_GID}) for ${DOCKER_SOCK}"
+        sudo groupadd --gid "${SOCK_GID}" docker-host
+        EXISTING_GROUP="docker-host"
+    fi
+    if ! id -nG "$(id -un)" 2>/dev/null | grep -qw "${EXISTING_GROUP}"; then
+        log "Adding $(id -un) to group '${EXISTING_GROUP}' for docker socket access"
+        sudo usermod -aG "${EXISTING_GROUP}" "$(id -un)"
+        # usermod は現在のログインシェルのグループ一覧には反映されないため、
+        # このプロセス(と exec で置き換わる子プロセス)にだけ反映させたい場合は
+        # sg/exec で再実行する必要がある。ここでは以降の nohup 起動プロセスに
+        # 反映させるため、このシェル自体を新しいグループ込みで再実行する。
+        exec sg "${EXISTING_GROUP}" -c "$(printf '%q ' "$0" "$@")"
+    fi
+fi
+
 # --- code-server ---
 if [ "${START_CODE_SERVER:-false}" = "true" ]; then
     log "Starting code-server"
