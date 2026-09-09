@@ -60,6 +60,11 @@ Rancher Desktop を開き、`Preferences > WSL > Integrations` で `Debian` を�
 の Docker デーモンを操作します。詳細は [docs/BACKGROUND.md](./docs/BACKGROUND.md)
 の「コンテナ内から `docker` コマンドを使う」参照)。
 
+ホストの全ドライブ(Windows の `C:`, `D:` 等)は、コンテナ内から
+`/mnt/host-drives/c/...`, `/mnt/host-drives/d/...` のようにアクセスできます
+(詳細は [docs/BACKGROUND.md](./docs/BACKGROUND.md) の
+「ホストの全ドライブをコンテナにマウントする」参照)。
+
 ---
 
 ## よく使う操作(すべて `create-dockerfile\docker` フォルダー内)

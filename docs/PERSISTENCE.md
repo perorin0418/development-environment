@@ -40,6 +40,15 @@ jcode の実行ファイル本体(`~/.jcode/builds/...`、`~/.local/bin/jcode` �
 `JCODE_HOME=/home/developer/.jcode-data` を設定し、認証情報だけをこちらに
 分離して永続化している。
 
+## ホストの全ドライブのマウント
+
+上記の認証情報とは別に、`compose.yaml` はホストの全ドライブ(Windows の
+C:, D: 等)を `WSL_HOST_DRIVES_SOURCE`(既定値 `/mnt`。WSL が DrvFS 経由で
+自動マウント済み)からコンテナの `/mnt/host-drives` へバインドマウントする。
+これは認証情報の永続化とは目的が異なり(コンテナ削除後もホスト側にデータは
+残り続ける)、`setup-dev-container.sh` の `mkdir`/`chown` 対象にも含めていない。
+詳細は [BACKGROUND.md](./BACKGROUND.md) 参照。
+
 ## 事前準備
 
 `setup-dev-container.bat`(内部で `setup-dev-container.sh` を実行)が、
