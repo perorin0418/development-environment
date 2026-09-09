@@ -68,10 +68,9 @@ services:
       # ソケットの GID とコンテナ内ユーザーの GID を合わせる処理は
       # entrypoint.sh が起動時に行う(詳細は Dockerfile・entrypoint.sh 参照)。
       - /var/run/docker.sock:/var/run/docker.sock
-      # ホストの全ドライブ(Windows の C:, D: 等)をコンテナにマウントする。
-      # WSL は起動時にホストの各ドライブを DrvFS 経由で /mnt/c, /mnt/d ... に
-      # 自動マウント済みのため、その /mnt をまるごとコンテナの /mnt/host-drives
-      # にバインドマウントするだけでよい(WSL_HOST_DRIVES_SOURCE は .env で
-      # 指定。既定値は /mnt)。DrvFS 経由のため /workspace(ext4)ほど高速では
-      # ない点に注意(詳細は docs/BACKGROUND.md 参照)。
-      - ${WSL_HOST_DRIVES_SOURCE:-/mnt}:/mnt/host-drives
+      # ホストの全ドライブ(Windows の C:, D: 等)のマウントは、ここでは定義
+      # しない。scripts/generate-host-drives-compose.sh が起動のたびに
+      # /proc/mounts から実際にマウントされているドライブを動的検出し、
+      # compose.host-drives.yaml にドライブ単位の個別バインドマウントとして
+      # 生成する(start-dev-container.bat が -f でこのファイルを追加読み込みする)。
+      # /mnt を丸ごとバインドマウントしない理由は docs/BACKGROUND.md 参照。

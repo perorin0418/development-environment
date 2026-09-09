@@ -42,12 +42,16 @@ jcode の実行ファイル本体(`~/.jcode/builds/...`、`~/.local/bin/jcode` �
 
 ## ホストの全ドライブのマウント
 
-上記の認証情報とは別に、`compose.yaml` はホストの全ドライブ(Windows の
-C:, D: 等)を `WSL_HOST_DRIVES_SOURCE`(既定値 `/mnt`。WSL が DrvFS 経由で
-自動マウント済み)からコンテナの `/mnt/host-drives` へバインドマウントする。
-これは認証情報の永続化とは目的が異なり(コンテナ削除後もホスト側にデータは
+上記の認証情報とは別に、ホストの全ドライブ(Windows の C:, D: 等)は
+`start-dev-container.bat`/`stop-dev-container.bat` 実行時に
+`scripts/generate-host-drives-compose.sh` が `WSL_HOST_DRIVES_SOURCE`
+(既定値 `/mnt`。WSL が自動マウント済み)配下を動的検出し、ドライブごとに
+`docker/config/compose.host-drives.yaml`(自動生成物)へバインドマウント
+定義を生成、コンテナの `/mnt/host-drives` 配下へマウントする。これは
+認証情報の永続化とは目的が異なり(コンテナ削除後もホスト側にデータは
 残り続ける)、`setup-dev-container.sh` の `mkdir`/`chown` 対象にも含めていない。
-詳細は [BACKGROUND.md](./BACKGROUND.md) 参照。
+`/mnt` を丸ごとマウントせずドライブ単位にしている理由は
+[BACKGROUND.md](./BACKGROUND.md) 参照。
 
 ## 事前準備
 

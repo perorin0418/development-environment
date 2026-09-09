@@ -101,25 +101,68 @@ Docker デーモンの管理下に置かれる(コンテナの中に入れ子で
 
 ## ホストの全ドライブ(Windows の C:, D: 等)をコンテナにマウントする
 
-WSL は起動時に、Windows ホスト側の各ドライブを DrvFS 経由で自動的に
-`/mnt/c`, `/mnt/d` ... としてマウントしている(`wsl.conf` の
-`automount` 既定動作)。そのため、コンテナ側から全ドライブへアクセスしたい
-場合、WSL Debian 内の `/mnt` を丸ごとコンテナへバインドマウントするだけでよく、
-ドライブごとに個別の設定を追加する必要はない。
+WSL は起動時に、Windows ホスト側の各ドライブを自動的に `/mnt/c`, `/mnt/d` ...
+としてマウントしている(`wsl.conf` の `automount` 既定動作。ドライバは環境に
+よって DrvFS または virtiofs)。コンテナ側から全ドライブへアクセスしたいが、
+`/mnt` を丸ごとバインドマウントすると以下の問題があったため、現在は
+ドライブごとに個別のバインドマウントを動的生成する方式にしている。
 
-- **compose.yaml**: `WSL_HOST_DRIVES_SOURCE`(既定値 `/mnt`)をコンテナの
-  `/mnt/host-drives` にバインドマウントする。コンテナ内からは
-  `/mnt/host-drives/c/...`、`/mnt/host-drives/d/...` のように各ドライブへ
-  アクセスできる。
-- コンテナ内の `/mnt` 直下(`/mnt/host-drives` を含む)を直接使わず
-  `/mnt/host-drives` という専用パスにしているのは、コンテナ内で別途
-  `/mnt` 配下を使う他のマウント(将来的な追加分も含む)と衝突しないようにする
-  ため。
+- **問題(以前の方式)**: `/mnt` はその配下に `/mnt/c`, `/mnt/d` ... という
+  個別のマウントポイントがネストされたディレクトリである。このディレクトリを
+  そのままバインドマウントすると、コンテナ再作成時に Rancher Desktop 側の
+  アンマウント処理がネストされたマウントポイントを含むディレクトリを
+  一括アンマウントしようとして失敗し、`start-dev-container.bat` が次の
+  エラーで失敗することがあった:
+  ```text
+  Error response from daemon: failed to modify the response from the
+  backend: munger failed for /containers/.../start: could not unmount
+  bind mount ...: invalid argument
+  ```
+- **対処(現在の方式)**: `scripts/generate-host-drives-compose.sh` が
+  `start-dev-container.bat`/`stop-dev-container.bat` 実行時に WSL Debian 側で
+  自動実行され、`/proc/mounts` から `WSL_HOST_DRIVES_SOURCE`(既定値 `/mnt`)
+  配下で実際にマウントされているドライブ(`/mnt/c`, `/mnt/d` 等)を検出し、
+  ドライブ1つにつき1行のバインドマウントを定義する
+  `docker/config/compose.host-drives.yaml`(自動生成物。`.gitignore` 対象)を
+  生成する。`start-dev-container.bat`/`stop-dev-container.bat` は
+  `docker compose -f compose.yaml -f compose.host-drives.yaml ...` の形で
+  この override ファイルを追加読み込みする。ネストマウントを含まない末端の
+  ディレクトリ(ドライブ単位)だけをバインドマウントするため、アンマウント時に
+  上記のエラーは発生しない。
+- コンテナ内からは `/mnt/host-drives/c/...`、`/mnt/host-drives/d/...` の
+  ように各ドライブへアクセスできる。コンテナ内の `/mnt` 直下
+  (`/mnt/host-drives` を含む)を直接使わず `/mnt/host-drives` という専用
+  パスにしているのは、コンテナ内で別途 `/mnt` 配下を使う他のマウント
+  (将来的な追加分も含む)と衝突しないようにするため。
 - `/workspace`(WSL Debian 側 ext4 を直接マウント)とは異なり、こちらは
-  DrvFS(9P プロトコル経由)であるため I/O は低速になる。大きなビルド成果物の
+  DrvFS/virtiofs 経由であるため I/O は低速になる。大きなビルド成果物の
   読み書きなど I/O 負荷が高い作業には向かない。Windows 側ファイルをやり取り
   する用途(参照・コピー等)を想定している。
 - `setup-dev-container.sh` の `mkdir -p`/`chown` 対象には含めていない。
   `/mnt` は WSL がシステムとして自動管理する既存のマウントポイントであり、
   ホストの全ドライブに対して再帰的な `chown` を行うのは危険かつ不要なため
   (元々 Windows 側の各ユーザー・ACL で権限管理されている)。
+- 新しいドライブを WSL にマウントし直した場合(例: USB ドライブ接続後)は、
+  `start-dev-container.bat` を再実行すれば `generate-host-drives-compose.sh`
+  が再検出して `compose.host-drives.yaml` を更新する。
+- **ネットワークドライブ(Z: など)について**: WSL は起動時に Windows の
+  ローカル/固定ドライブ(C:, D: 等)しか自動マウントせず、Windows でドライブ
+  文字にマップしたネットワークドライブ(`net use Z: \\server\share` や
+  エクスプローラーの「ネットワークドライブの割り当て」で設定したもの)は
+  自動では WSL 側に現れない。ドライブ文字の割り当ては環境ごとに異なるため
+  ハードコーディングできない。そこで `start-dev-container.bat`/
+  `stop-dev-container.bat` は `scripts/mount-network-drives.sh` を
+  `wsl.exe -u root`(パスワード不要で root 権限を取得できる)経由で実行し、
+  以下の手順で動的にマウントする:
+  1. `scripts/list-network-drives.ps1` が Windows 側で
+     `WScript.Network.EnumNetworkDrives()` を呼び出し、現在マップされている
+     ネットワークドライブ(ドライブ文字と UNC パスの組)を列挙する。
+  2. まだ `/mnt/<ドライブ文字>` にマウントされていなければ、
+     `mount -t drvfs <UNCパス> /mnt/<ドライブ文字> -o metadata,uid=...,gid=...`
+     でマウントする(idempotent。既にマウント済みなら何もしない)。
+  3. これで `/mnt` 配下にローカルドライブと同様に現れるため、後続の
+     `generate-host-drives-compose.sh` が通常のドライブと同じ扱いで検出し、
+     `compose.host-drives.yaml` に個別のバインドマウントとして追加する。
+  - ネットワークドライブが切断されている(VPN 未接続等)場合はマウントに
+    失敗するが、致命的エラーにはせず警告を出して続行する(そのドライブは
+    コンテナから見えないだけで、他の処理には影響しない)。

@@ -26,8 +26,20 @@ if errorlevel 1 (
     goto :end
 )
 
+echo [INFO] Ensuring host-drives compose override exists inside WSL Debian...
+wsl.exe -d %DISTRO% -u root -- bash -lc "cd \"$(wslpath -a '%SCRIPT_DIR%')\" && bash scripts/mount-network-drives.sh"
+if errorlevel 1 (
+    echo [WARN] Failed to mount network drives. Continuing without them, see log above.
+)
+wsl.exe -d %DISTRO% -- bash -lc "cd \"$(wslpath -a '%SCRIPT_DIR%')\" && bash scripts/generate-host-drives-compose.sh"
+if errorlevel 1 (
+    echo [ERROR] Failed to generate host-drives compose override. See the log above.
+    set "RESULT=1"
+    goto :end
+)
+
 echo [INFO] Running "docker compose down" inside WSL Debian...
-wsl.exe -d %DISTRO% -- bash -lc "cd \"$(wslpath -a '%SCRIPT_DIR%config')\" && docker compose down"
+wsl.exe -d %DISTRO% -- bash -lc "cd \"$(wslpath -a '%SCRIPT_DIR%config')\" && docker compose -f compose.yaml -f compose.host-drives.yaml down"
 if errorlevel 1 (
     echo [ERROR] docker compose down failed. See the log above.
     set "RESULT=1"

@@ -102,3 +102,60 @@ id
 `stop-dev-container.bat` → `start-dev-container.bat` でコンテナを再作成する
 (`entrypoint.sh` は毎起動時にグループ調整を行うため、多くの場合これで解消する)。
 
+## `start-dev-container.bat` で `munger failed ... could not unmount bind mount ... invalid argument` が出る
+
+**原因**: 以前のバージョンではホストの全ドライブを `/mnt` ごとコンテナへ
+バインドマウントしていたが、`/mnt` はその配下に `/mnt/c`, `/mnt/d` ... という
+個別のマウントポイントがネストされたディレクトリであるため、コンテナ再作成時に
+Rancher Desktop 側のアンマウント処理が失敗することがあった。
+
+**対処**: 現在は `scripts/generate-host-drives-compose.sh` がドライブごとに
+個別のバインドマウントを動的生成する方式に変更済み(詳細は
+[BACKGROUND.md](./BACKGROUND.md) の「ホストの全ドライブをコンテナにマウントする」
+参照)。このエラーが出る場合、リポジトリを最新化した上で
+`stop-dev-container.bat` → `start-dev-container.bat` を実行し、コンテナを
+作り直してください。それでも解消しない場合は `wsl --shutdown` で WSL 全体を
+再起動してから Rancher Desktop を再起動し、再度試してください。
+
+## コンテナ内でネットワークドライブ(Z: など)が `/mnt/host-drives/z` に見えない
+
+**原因候補1**: そのネットワークドライブが Windows 側で切断されている
+(VPN 未接続、共有サーバーに到達できない等)。`start-dev-container.bat` の
+ログに `[mount-network-drives] ... -> FAILED` と出ていないか確認する。
+
+**原因候補2**: WSL Debian のシェルで手動マウントしていた古い `/mnt/<文字>`
+が残っていて、`mount-network-drives.sh` が「既にマウント済み」と判断して
+スキップしている。WSL Debian のシェルで以下を実行して状態を確認する:
+
+```bash
+cat /proc/mounts | grep /mnt/z
+```
+
+期待と異なるパスがマウントされている場合、`wsl --shutdown` で WSL を
+完全に再起動してから `start-dev-container.bat` を再実行する
+(WSL 再起動により全マウントがリセットされる)。
+
+**原因候補3**: WSL Debian 側で Windows 実行ファイルを呼び出す機能
+(interop)自体が壊れている。`start-dev-container.bat` のログに
+`[mount-network-drives] WARNING: powershell.exe exited with status ...`
+と出ていないか確認する。WSL Debian のシェルで以下を実行して確認できる:
+
+```bash
+cat /proc/sys/fs/binfmt_misc/WSLInterop
+```
+
+`No such file or directory` の場合、interop が無効化されている
+(`cannot execute binary file: Exec format error` の原因)。本リポジトリの
+スクリプトの問題ではなく WSL 側の状態異常のため、`wsl --shutdown` で
+WSL 全体を再起動する必要がある(WSL Debian だけの再起動(`wsl -t Debian`)
+では直らないことがある)。ただし `wsl --shutdown` は Rancher Desktop の
+内部 VM(`rancher-desktop`)も巻き込んで停止させる可能性があるため、
+実行後に `docker compose up` が
+`Cannot connect to the Docker daemon at unix:///var/run/docker.sock` で
+失敗する場合は、Rancher Desktop を手動で再起動すること。
+
+**対処**: いずれの場合も `start-dev-container.bat` を再実行すれば
+`scripts/mount-network-drives.sh` が再検出・再マウントを試みる。
+ネットワークドライブが利用できない状態でも `start-dev-container.bat` 自体は
+失敗せず、警告を出してそのまま起動を続ける。
+

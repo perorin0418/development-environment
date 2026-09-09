@@ -1,1 +1,2 @@
 docker/config/.env
+docker/config/compose.host-drives.yaml
