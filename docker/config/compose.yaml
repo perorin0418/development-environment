@@ -24,6 +24,14 @@ services:
       START_CODE_SERVER: "true"
       START_JCODE: "true"
       START_HERDR: "true"
+      # lean-ctx のシェルフックを非対話シェル(`bash -c "..."`)でも有効化する。
+      # jcode の Bash ツールはコマンドをこの形で実行するため、対話シェル前提の
+      # ~/.bashrc 経由のフックだけでは発火しない(BASH_ENV は非対話シェルのみ
+      # 読み込まれるため、`docker exec -it ... bash` の対話シェルには影響しない)。
+      # jcode-env.sh は Dockerfile がビルド時に生成する(docker/Dockerfile
+      # 「lean-ctx: jcode 用シェルフック + MCP サーバー登録」セクション参照)。
+      BASH_ENV: "/home/developer/.config/lean-ctx/jcode-env.sh"
+      LEAN_CTX_AGENT: "1"
     volumes:
       # WSL Debian 側のディレクトリ(ext4)を /workspace にマウントする。
       # WSL_MOUNT_SOURCE は .env で指定する(WSL Debian のネイティブパス)。
