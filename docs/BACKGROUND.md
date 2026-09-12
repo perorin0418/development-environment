@@ -166,3 +166,44 @@ WSL は起動時に、Windows ホスト側の各ドライブを自動的に `/mn
   - ネットワークドライブが切断されている(VPN 未接続等)場合はマウントに
     失敗するが、致命的エラーにはせず警告を出して続行する(そのドライブは
     コンテナから見えないだけで、他の処理には影響しない)。
+
+## jcode 用コンテキスト圧縮ツール(rtk / lean-ctx)を入れた理由
+
+jcode エージェントがシェルコマンド(`git log`, `cargo test` 等)を実行すると、
+出力全文がそのままコンテキストウィンドウに乗ってしまい、トークンを大量に
+消費する。これを緩和するため、出力を要約・圧縮する2つの CLI をイメージに
+焼き込んでいる。
+
+- **rtk**(Rust Token Killer): `rtk git status` のように明示的にコマンドへ
+  前置して使う圧縮プロキシ。jcode 側に組み込みのフック機構が無いため、
+  自動書き換えはできない(利用は `docker/config/preferred-tools.md` 経由の
+  提案止まり)。
+- **lean-ctx**: シェルの alias 方式フックと MCP サーバー(`ctx_read` 等)の
+  両方を提供する。MCP サーバーとしては `docker/Dockerfile` がビルド時に
+  `$JCODE_HOME/mcp.json` へ登録し、シェルフックとしては `lean-ctx init
+  --global` が生成した `~/.config/lean-ctx/{env.sh,shell-hook.bash}` を
+  ベースに使う。
+
+### なぜ非対話シェル向けの追加ラッパー(jcode-env.sh)が必要か
+
+lean-ctx の標準シェルフックは bash の **alias** で実装されており、
+alias 展開は対話シェルでは既定で有効だが、非対話シェル(`bash -c "..."`)では
+`shopt -s expand_aliases` を明示しない限り無効になる。jcode の `Bash` ツールは
+コマンドをまさにこの `bash -c "..."` の形で実行するため、`~/.bashrc` への
+追記(対話シェル前提)だけでは効かない。
+
+対処として、Dockerfile が `~/.config/lean-ctx/jcode-env.sh` という薄い
+ラッパー(`shopt -s expand_aliases` を立ててから本体の `env.sh` を読み込むだけ)
+を生成し、`compose.yaml` の `BASH_ENV`/`LEAN_CTX_AGENT` 環境変数でこれを
+使わせている。`BASH_ENV` は非対話シェルでのみ読み込まれる変数のため、
+`docker exec -it dev-container bash` で入る対話シェルの挙動には影響しない。
+
+### なぜ `entrypoint.sh` でも mcp.json / preferred-tools.md を補完するか
+
+`$JCODE_HOME`(`~/.jcode-data`)は compose.yaml で永続化用にバインドマウント
+しているため、初回起動時はホスト側の空ディレクトリで隠れてしまう
+(他の `config.toml` 等と同じ問題。上記「1. apt base packages」節や
+`docs/PERSISTENCE.md` 参照)。そのため `entrypoint.sh` が起動のたびに
+「無ければ補完する」形で、lean-ctx の MCP サーバー登録とガイダンス文書
+(`preferred-tools.md`)を復元する。mcp.json は他の MCP サーバー設定を
+壊さないよう `jq` でマージしている。

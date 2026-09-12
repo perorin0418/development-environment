@@ -214,6 +214,31 @@ RUN NVIM_ARCH="$(dpkg --print-architecture)" \
     && ln -sf /opt/nvim/bin/nvim /usr/local/bin/nvim
 
 # ---------------------------------------------------------------------------
+# 4f. rtk (Rust Token Killer) / lean-ctx: jcode エージェント用コンテキスト圧縮CLI
+# ---------------------------------------------------------------------------
+# どちらも「シェルコマンドの出力をLLMに見せる前に圧縮する」CLI。lean-ctx は
+# シェルフック方式に加えて MCP サーバーも提供する(後述のセクション参照)。
+# lean-ctx は x86_64/arm64 とも musl(静的リンク)版があるが、rtk の arm64 版は
+# musl 提供が無く gnu(動的リンク, glibc依存)版のみのため、アーキテクチャごとに
+# 別々にファイル名を組み立てる。
+RUN DPKG_ARCH="$(dpkg --print-architecture)" \
+    && case "${DPKG_ARCH}" in \
+         amd64) RTK_ARCH="x86_64-unknown-linux-musl"; LC_ARCH="x86_64-unknown-linux-musl" ;; \
+         arm64) RTK_ARCH="aarch64-unknown-linux-gnu"; LC_ARCH="aarch64-unknown-linux-musl" ;; \
+         *) echo "Unsupported architecture for rtk/lean-ctx: ${DPKG_ARCH}" >&2; exit 1 ;; \
+       esac \
+    && curl -fsSL "https://github.com/rtk-ai/rtk/releases/latest/download/rtk-${RTK_ARCH}.tar.gz" \
+        -o /tmp/rtk.tar.gz \
+    && tar -C /usr/local/bin -xzf /tmp/rtk.tar.gz rtk \
+    && chmod +x /usr/local/bin/rtk \
+    && rm -f /tmp/rtk.tar.gz \
+    && curl -fsSL "https://github.com/yvgude/lean-ctx/releases/latest/download/lean-ctx-${LC_ARCH}.tar.gz" \
+        -o /tmp/lean-ctx.tar.gz \
+    && tar -C /usr/local/bin -xzf /tmp/lean-ctx.tar.gz lean-ctx \
+    && chmod +x /usr/local/bin/lean-ctx \
+    && rm -f /tmp/lean-ctx.tar.gz
+
+# ---------------------------------------------------------------------------
 # 5. 非rootユーザー
 # ---------------------------------------------------------------------------
 # WSL Debian 側のディレクトリをボリュームマウントした際にファイル所有権が
@@ -263,6 +288,51 @@ RUN mkdir -p "${HOME}/.local/bin" \
 # JCODE_HOME(= ~/.jcode-data)側に書く。
 RUN mkdir -p "${JCODE_HOME}" \
     && printf '[features]\ncheck_updates = false\n' > "${JCODE_HOME}/config.toml"
+
+# ---------------------------------------------------------------------------
+# 7a. lean-ctx: jcode 用シェルフック + MCP サーバー登録
+# ---------------------------------------------------------------------------
+# lean-ctx はエイリアス方式のシェルフック(git/cargo/npm 等の出力を圧縮する)
+# と MCP サーバー(ctx_read 等のツール)の両方を提供する。
+#
+# シェルフック: `lean-ctx init --global` は ~/.bashrc にフック読み込み1行を
+# 追記し、本体は ~/.config/lean-ctx/{env.sh,shell-hook.bash} に生成する。
+# これらは compose.yaml で永続化対象にしていない(bashrc 等はイメージに
+# 焼き込んだツールチェーン群と同様、ビルド時に確定させる方針。README.md の
+# 「認証情報・設定の永続化」参照)ため、ここで実行して問題ない。
+#
+# ただし alias ベースのフックは非対話シェル(`bash -c "..."`。jcode の Bash
+# ツールがコマンドを実行する形)では `shopt -s expand_aliases` が既定 off
+# のため素通りしてしまう。jcode 用に、先に expand_aliases を立ててから本体の
+# env.sh を読み込むラッパー(jcode-env.sh)を用意し、compose.yaml の
+# `BASH_ENV`/`LEAN_CTX_AGENT` でこれを使わせる(対話シェルには影響しない)。
+#
+# MCP サーバー登録: mcp.json は config.toml と同じく JCODE_HOME 配下にあり、
+# 初回のバインドマウントでビルド時の内容が隠れてしまうため、
+# entrypoint.sh 側でも同じ内容を(存在しなければ)補完する
+# (docker/scripts/entrypoint.sh 参照)。
+RUN lean-ctx init --global >/tmp/lean-ctx-init.log 2>&1 \
+    && { \
+        echo '# jcode 用ラッパー(entrypoint.sh からは触らない。Dockerfile が生成)。'; \
+        echo '# 非対話シェル(bash -c)でも alias ベースのフックが効くよう expand_aliases を'; \
+        echo '# 先に有効化してから本体の env.sh を読み込む。'; \
+        echo 'shopt -s expand_aliases'; \
+        echo '. "$HOME/.config/lean-ctx/env.sh"'; \
+    } > "${HOME}/.config/lean-ctx/jcode-env.sh"
+
+RUN mkdir -p "${JCODE_HOME}" \
+    && printf '{\n  "mcpServers": {\n    "lean-ctx": {\n      "command": "lean-ctx"\n    }\n  }\n}\n' \
+        > "${JCODE_HOME}/mcp.json"
+
+# rtk/lean-ctx の使い方を jcode エージェントに知らせる指示ファイル
+# (config/preferred-tools.md)。jcode はこれを $JCODE_HOME/preferred-tools.md
+# から読み、システムプロンプトに追加する(docs/SYSTEM_PROMPT_CONFIG.md 参照)。
+# JCODE_HOME 配下は初回のバインドマウントで空になるため、雛形を
+# /opt/ctx-tools-preferred-tools.md にも置いておき、entrypoint.sh が
+# (ファイルが無ければ)そこからコピーして補完する
+# (docker/scripts/entrypoint.sh 参照)。
+COPY config/preferred-tools.md /opt/ctx-tools-preferred-tools.md
+RUN cp /opt/ctx-tools-preferred-tools.md "${JCODE_HOME}/preferred-tools.md"
 
 # ---------------------------------------------------------------------------
 # 7b. Neovim 設定 (lazy.nvim + プラグイン群)

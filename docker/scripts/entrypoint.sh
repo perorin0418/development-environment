@@ -39,6 +39,36 @@ if [ ! -f "${JCODE_CONFIG_FILE}" ]; then
     printf '[features]\ncheck_updates = false\n' > "${JCODE_CONFIG_FILE}"
 fi
 
+# ~/.jcode-data/mcp.json ($JCODE_HOME): lean-ctx を MCP サーバーとして登録する。
+# lean-ctx バイナリは Dockerfile でイメージに焼き込み済み(/usr/local/bin/lean-ctx)。
+# mcp.json は config.toml と同じく JCODE_HOME 配下にあり、初回マウント時は
+# 空になるため、lean-ctx エントリが無ければ追記する(ユーザーが後から他の
+# MCP サーバーを追加していても、その内容を壊さないよう jq でマージする)。
+JCODE_MCP_FILE="${JCODE_HOME:-${HOME}/.jcode-data}/mcp.json"
+if command -v lean-ctx >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+    mkdir -p "$(dirname "${JCODE_MCP_FILE}")"
+    [ -f "${JCODE_MCP_FILE}" ] || echo '{}' > "${JCODE_MCP_FILE}"
+    if ! jq -e '(.mcpServers["lean-ctx"] // .servers["lean-ctx"]) // empty' \
+        "${JCODE_MCP_FILE}" >/dev/null 2>&1; then
+        log "Registering lean-ctx MCP server in ${JCODE_MCP_FILE}"
+        TMP_MCP_FILE="$(mktemp)"
+        jq '.mcpServers = ((.mcpServers // {}) + {"lean-ctx": {"command": "lean-ctx"}})' \
+            "${JCODE_MCP_FILE}" > "${TMP_MCP_FILE}" \
+            && mv "${TMP_MCP_FILE}" "${JCODE_MCP_FILE}"
+    fi
+fi
+
+# ~/.jcode-data/preferred-tools.md ($JCODE_HOME): rtk/lean-ctx の使い方を
+# jcode エージェントに知らせる指示ファイル。config.toml と同様 JCODE_HOME 配下
+# にあり初回マウント時は空になるため、無ければ焼き込み済みの雛形からコピーする
+# (雛形は Dockerfile が /opt/ctx-tools-preferred-tools.md に置く)。
+JCODE_PREFERRED_TOOLS_FILE="${JCODE_HOME:-${HOME}/.jcode-data}/preferred-tools.md"
+if [ ! -f "${JCODE_PREFERRED_TOOLS_FILE}" ] && [ -f /opt/ctx-tools-preferred-tools.md ]; then
+    log "Initializing ${JCODE_PREFERRED_TOOLS_FILE} (rtk/lean-ctx usage guidance)"
+    mkdir -p "$(dirname "${JCODE_PREFERRED_TOOLS_FILE}")"
+    cp /opt/ctx-tools-preferred-tools.md "${JCODE_PREFERRED_TOOLS_FILE}"
+fi
+
 # ~/.ssh: sshd/ssh クライアントはディレクトリ・鍵ファイルのパーミッションが
 # 緩いと使用を拒否するため、バインドマウント後(ホスト側 WSL のパーミッションが
 # そのまま反映される)に毎回強制し直す。
