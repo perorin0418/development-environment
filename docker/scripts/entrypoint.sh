@@ -74,8 +74,13 @@ fi
 # そのまま反映される)に毎回強制し直す。
 if [ -d "${HOME}/.ssh" ]; then
     chmod 700 "${HOME}/.ssh"
-    find "${HOME}/.ssh" -maxdepth 1 -type f -name '*.pub' -exec chmod 644 {} +
-    find "${HOME}/.ssh" -maxdepth 1 -type f ! -name '*.pub' -exec chmod 600 {} +
+    # 注意: lean-ctx のシェルフック(BASH_ENV 経由、compose.yaml 参照)がコンテナ内
+    # 全ての bash 実行(この entrypoint.sh 自身=PID 1 も含む)に適用され、
+    # `find ... -exec` をセキュリティ上ブロックする。`set -e` によりブロック時に
+    # 本スクリプトが非ゼロ終了し、PID 1 が落ちてコンテナごと終了してしまうため、
+    # ここでは `-exec` を使わず `-print0 | xargs -0` で代替する。
+    find "${HOME}/.ssh" -maxdepth 1 -type f -name '*.pub' -print0 | xargs -0 -r chmod 644
+    find "${HOME}/.ssh" -maxdepth 1 -type f ! -name '*.pub' -print0 | xargs -0 -r chmod 600
 fi
 
 # --- ホスト Docker ソケット ---
