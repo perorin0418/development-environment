@@ -1,0 +1,62 @@
+services:
+  dev:
+    build:
+      # compose.yaml は docker/config/ 配下にあるが、Dockerfile やそこから
+      # COPY される scripts/ は docker/ 直下(1階層上)にあるため、
+      # ビルドコンテキストを一つ上に指定する。
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+    image: general-develop:latest
+    container_name: general-develop
+    # 常に起動し続ける: コンテナが(異常終了・OS再起動後の Docker 起動などで)
+    # 停止しても Docker により自動的に再起動される。
+    restart: always
+    # Dockerfile の CMD ("sleep infinity") をそのままフォアグラウンドプロセスとして
+    # 動かし続けることで、コンテナを常駐させる。
+    environment:
+      START_HERDR: "true"
+    volumes:
+      # WSL Debian 側のディレクトリ(ext4)を /workspace にマウントする。
+      # WSL_MOUNT_SOURCE は .env で指定する(WSL Debian のネイティブパス)。
+      - ${WSL_MOUNT_SOURCE}:/workspace
+      # 以下は認証情報・設定を含むディレクトリ/ファイルを WSL Debian 側に
+      # 個別に永続化するためのマウント。HOME 配下を丸ごとマウントしないのは、
+      # nvm 等ビルド時にイメージへ焼き込んだツールチェーンを
+      # 空のホスト側ディレクトリで上書きしてしまうのを避けるため
+      # (詳細は README.md の「認証情報・設定の永続化」参照)。
+      # ~/.config/gh: gh auth login の認証情報
+      - ${WSL_GH_CONFIG_HOME}:/home/developer/.config/gh
+      # ~/.claude: Claude Code CLI の認証情報 (.credentials.json 等)
+      - ${WSL_CLAUDE_HOME}:/home/developer/.claude
+      # ~/.ssh: SSH 鍵 (git 等での鍵認証に使用)
+      - ${WSL_SSH_HOME}:/home/developer/.ssh
+      # ~/.config/git: git のユーザー設定 (ディレクトリマウント)。
+      # ~/.gitconfig をファイル単体でマウントすると、gh auth login 等が
+      # 設定書き込み時に rename でファイルを置き換えようとして
+      # "Device or resource busy" になるため、XDG 準拠のディレクトリ
+      # (~/.config/git/config も git のグローバル設定として読まれる)を
+      # マウントすることでこれを回避している。
+      - ${WSL_GIT_CONFIG_HOME}:/home/developer/.config/git
+      # ~/.npmrc: npm の認証・レジストリ設定 (ファイルマウント。同上)
+      - ${WSL_NPMRC_FILE}:/home/developer/.npmrc
+      # ~/.aws: AWS CLI の認証情報・設定 (credentials, config 等)
+      - ${WSL_AWS_HOME}:/home/developer/.aws
+      # ~/.config/herdr: herdr の設定・セッション状態 (config.toml, session.json 等)
+      - ${WSL_HERDR_CONFIG_HOME}:/home/developer/.config/herdr
+      # ~/.local/state/herdr: herdr のエージェント検出状態 (agent-detection/ 配下)
+      - ${WSL_HERDR_STATE_HOME}:/home/developer/.local/state/herdr
+      # ホストの Docker デーモンのソケットをそのままバインドマウントする。
+      # これにより、コンテナ内(Docker-in-Docker は行わない)から docker-ce-cli
+      # 経由でホスト側(Rancher Desktop)の Docker を直接操作できる。
+      # ソケットの GID とコンテナ内ユーザーの GID を合わせる処理は
+      # entrypoint.sh が起動時に行う(詳細は Dockerfile・entrypoint.sh 参照)。
+      - /var/run/docker.sock:/var/run/docker.sock
+      # ホストの全ドライブ(Windows の C:, D: 等)のマウントは、ここでは定義
+      # しない。scripts/generate-host-drives-compose.sh が起動のたびに
+      # /proc/mounts から実際にマウントされているドライブを動的検出し、
+      # compose.host-drives.yaml にドライブ単位の個別バインドマウントとして
+      # 生成する(start.bat が -f でこのファイルを追加読み込みする)。
+      # /mnt を丸ごとバインドマウントしない理由は docs/BACKGROUND.md 参照。
