@@ -59,15 +59,11 @@ if [ -S "${DOCKER_SOCK}" ]; then
 fi
 
 # --- herdr ---
+# SHELL は Dockerfile の ENV で /bin/bash に固定済み(herdr が pane 生成時の
+# デフォルトシェルとして readline 非対応の /bin/sh(dash) にフォールバックし、
+# pane 内で矢印キー等の行編集が効かなくなるのを防ぐため)。
 if [ "${START_HERDR:-false}" = "true" ]; then
     log "Starting herdr server"
-    # entrypoint.sh は nohup/バックグラウンド起動のため SHELL 環境変数が
-    # 設定されておらず、herdr が pane 生成時のデフォルトシェルとして
-    # readline 非対応の /bin/sh(dash) にフォールバックしてしまう。
-    # これにより pane 内で矢印キー等の行編集が事実上効かなくなる
-    # (矢印キーがエスケープシーケンスのまま表示される)ため、明示的に
-    # /bin/bash を指定する。
-    export SHELL=/bin/bash
     nohup herdr server >/tmp/herdr.log 2>&1 &
 fi
 

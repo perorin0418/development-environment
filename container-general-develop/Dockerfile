@@ -35,7 +35,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     USERNAME=${USERNAME} \
     HOME=/home/${USERNAME} \
     NVM_DIR=/home/${USERNAME}/.nvm \
-    PATH=/home/${USERNAME}/.local/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    PATH=/home/${USERNAME}/.local/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    SHELL=/bin/bash
 
 # nvm/uv のインストーラースクリプトは bash 依存(dash非互換)のため、
 # 以降の RUN は bash で実行する。
