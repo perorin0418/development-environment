@@ -31,6 +31,12 @@ services:
       - ${WSL_GH_CONFIG_HOME}:/home/developer/.config/gh
       # ~/.claude: Claude Code CLI の認証情報 (.credentials.json 等)
       - ${WSL_CLAUDE_HOME}:/home/developer/.claude
+      # ~/.claude.json: Claude Code CLI のアカウント状態 (oauthAccount, userID 等)。
+      # ~/.claude ディレクトリとは別の $HOME 直下の単一ファイルのため、
+      # 上記マウントではカバーされず個別マウントが必要(詳細は
+      # docs/PERSISTENCE.md 参照)。ファイル単体マウントのため
+      # ~/.npmrc と同様、事前に touch が必要(setup.sh が行う)。
+      - ${WSL_CLAUDE_JSON_FILE}:/home/developer/.claude.json
       # ~/.ssh: SSH 鍵 (git 等での鍵認証に使用)
       - ${WSL_SSH_HOME}:/home/developer/.ssh
       # ~/.config/git: git のユーザー設定 (ディレクトリマウント)。

@@ -13,6 +13,7 @@ WSL Debian 側へバインドマウントする(`~/` 配下を丸ごとマウン
 | --- | --- | --- |
 | `~/.config/gh` | `gh auth login` の認証情報 | `WSL_GH_CONFIG_HOME` |
 | `~/.claude` | Claude Code CLI の認証情報 (`.credentials.json` 等) | `WSL_CLAUDE_HOME` |
+| `~/.claude.json` | Claude Code CLI のアカウント状態 (`oauthAccount`, `userID` 等)。`~/.claude` ディレクトリとは別の `$HOME` 直下の単一ファイル | `WSL_CLAUDE_JSON_FILE` |
 | `~/.ssh` | SSH 鍵 | `WSL_SSH_HOME` |
 | `~/.config/git` | git のユーザー設定(ディレクトリ) | `WSL_GIT_CONFIG_HOME` |
 | `~/.npmrc` | npm の認証・レジストリ設定(ファイル) | `WSL_NPMRC_FILE` |
@@ -28,6 +29,17 @@ rename で置き換えようとして `Device or resource busy` になるため
 git はグローバル設定として `~/.gitconfig` が無ければ `~/.config/git/config`
 を読むため、ディレクトリ側をマウントすることで同じ書き込みパターンでも
 問題が起きないようにしている。
+
+## `~/.claude.json` の rename 上書きに関する注意
+
+`~/.claude` ディレクトリのマウントは既存のリレー経由バインドマウントで、
+既存ファイルへの `mv`(rename)上書きが失敗する既知の問題がある
+(`settings.json` の statusLine/permissions 書き込みで実際に発生し、
+`cat`+`rm` による直接書き込みに変更して回避した。Dockerfile 7c/7d 参照)。
+`~/.claude.json` は Claude Code CLI 自身が(このリポジトリのスクリプトではなく
+CLI 内部のロジックで)書き込むファイルのため、同じ理由で書き込みが
+失敗している場合はこちら側では回避できない。その場合は CLI のログや
+`strace` 等で実際の書き込み方式(rename か in-place 上書きか)を確認すること。
 
 ## ホストの全ドライブのマウント
 

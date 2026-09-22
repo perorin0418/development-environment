@@ -77,6 +77,7 @@ DIRS=(
 )
 FILES=(
     "${WSL_NPMRC_FILE:-}"
+    "${WSL_CLAUDE_JSON_FILE:-}"
 )
 
 for d in "${DIRS[@]}"; do
