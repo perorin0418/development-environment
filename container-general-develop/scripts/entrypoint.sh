@@ -79,20 +79,10 @@ if [ -S "${DOCKER_SOCK}" ]; then
 fi
 
 # --- Claude Code statusline ---
-# statusline スクリプト本体はイメージの /opt/statusline.sh に焼き込み済み
-# (Dockerfile 参照)。~/.claude はホスト側にバインドマウントされ内容が
-# 起動ごとに変わり得るため、settings.json の statusLine 設定はここで
-# 毎回マージして最新のイメージ側パスを指すようにする(他のキーは温存する)。
-CLAUDE_SETTINGS="${HOME}/.claude/settings.json"
-if [ -d "${HOME}/.claude" ]; then
-    if [ ! -f "${CLAUDE_SETTINGS}" ]; then
-        echo '{}' > "${CLAUDE_SETTINGS}"
-    fi
-    CLAUDE_SETTINGS_TMP="$(mktemp)"
-    jq '.statusLine = {"type": "command", "command": "/opt/statusline.sh"}' \
-        "${CLAUDE_SETTINGS}" > "${CLAUDE_SETTINGS_TMP}"
-    mv "${CLAUDE_SETTINGS_TMP}" "${CLAUDE_SETTINGS}"
-fi
+# settings.json への statusLine 設定マージは ~/.bashrc(対話シェル起動時)で
+# 行う(Dockerfile 7c 参照)。entrypoint.sh(PID 1, コンテナ起動直後)では
+# ホスト側バインドマウントがまだ確立していないことがあり、ここで書き込むと
+# 後からマウントが確立しても認証情報等が隠れて見えなくなる恐れがあるため。
 
 # --- herdr ---
 # SHELL は Dockerfile の ENV で /bin/bash に固定済み(herdr が pane 生成時の

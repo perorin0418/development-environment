@@ -273,8 +273,30 @@ RUN { \
 # 配下に焼き込んでも起動時にマウントで隠れてしまう。そのため、スクリプト本体は
 # /opt (イメージ焼き込み領域、上記 7b と同じ理由)に置き、~/.claude/settings.json
 # 側からそれを参照させる。settings.json はマウントされる既存ファイルのため、
-# ここでは書き込まず、entrypoint.sh が起動のたびに statusLine 設定をマージする。
+# ここでは書き込まない。
+#
+# statusLine 設定のマージは entrypoint.sh(コンテナ起動直後、PID 1)では
+# なく ~/.bashrc(対話シェル起動時、`docker exec -it` で入った時点)で行う。
+# entrypoint.sh の実行タイミングでは、ホスト(WSL)側からのバインドマウントが
+# まだ確立していないことがあり、その状態で書き込むと後からマウントが
+# 確立しても既存の認証情報等が隠れて見えなくなる恐れがあるため。
+# `docker exec -it` で入る対話シェルの時点ではコンテナは起動完了済みで
+# あり、マウントも確立している(alias claude 経由での headroom 起動が
+# 機能している = ~/.bashrc が読み込まれていることの裏付けでもある)。
 COPY --chmod=0755 scripts/statusline.sh /opt/statusline.sh
+RUN { \
+        echo ''; \
+        echo '# Claude Code statusline: settings.json の statusLine 設定を'; \
+        echo '# 対話シェル起動時にマージする(理由は Dockerfile 7c 参照)。'; \
+        echo 'if [ -d "${HOME}/.claude" ]; then'; \
+        echo '    __claude_settings="${HOME}/.claude/settings.json"'; \
+        echo '    [ -f "${__claude_settings}" ] || echo '"'"'{}'"'"' > "${__claude_settings}"'; \
+        echo '    __claude_settings_tmp="$(mktemp)"'; \
+        echo '    jq '"'"'.statusLine = {"type": "command", "command": "/opt/statusline.sh"}'"'"' "${__claude_settings}" > "${__claude_settings_tmp}" \'; \
+        echo '        && mv "${__claude_settings_tmp}" "${__claude_settings}"'; \
+        echo '    unset __claude_settings __claude_settings_tmp'; \
+        echo 'fi'; \
+    } >> "${HOME}/.bashrc"
 
 # ---------------------------------------------------------------------------
 # 11. 便利コマンドのシンボリックリンク (Debian の fd-find は fdfind という名前になる)
