@@ -75,6 +75,7 @@ DIRS=(
     "${WSL_AWS_HOME:-}"
     "${WSL_HERDR_CONFIG_HOME:-}"
     "${WSL_HERDR_STATE_HOME:-}"
+    "${WSL_PI_AGENT_HOME:-}"
 )
 FILES=(
     "${WSL_NPMRC_FILE:-}"

@@ -21,6 +21,7 @@ WSL Debian 側へバインドマウントする(`~/` 配下を丸ごとマウン
 | `~/.aws` | AWS CLI の認証情報・設定(`credentials`, `config` 等) | `WSL_AWS_HOME` |
 | `~/.config/herdr` | herdr の設定・セッション状態(`config.toml`, `session.json` 等) | `WSL_HERDR_CONFIG_HOME` |
 | `~/.local/state/herdr` | herdr のエージェント検出状態(`agent-detection/` 配下) | `WSL_HERDR_STATE_HOME` |
+| `~/.pi/agent` | pi の設定・認証情報・セッション(`auth.json`, sessions, pi パッケージ) | `WSL_PI_AGENT_HOME` |
 
 `~/.config/git` は `~/.gitconfig` をファイル単体でマウントするのではなく
 ディレクトリマウントにしている。`~/.gitconfig` をファイルとしてバインド

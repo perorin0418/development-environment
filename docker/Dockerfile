@@ -298,7 +298,7 @@ RUN curl -o- "https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/instal
     && nvm use --lts
 
 # ---------------------------------------------------------------------------
-# 7. pnpm, Vue CLI, Claude Code CLI, herdr, jcode
+# 7. pnpm, Vue CLI, Claude Code CLI, herdr, jcode, pi
 # ---------------------------------------------------------------------------
 # nvm はシェル関数ベースで Node を切り替えるため、npm install -g で入れた
 # コマンド(pnpm/vue/claude 等)の実体は $NVM_DIR/versions/node/<version>/bin
@@ -309,6 +309,7 @@ RUN curl -o- "https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/instal
 RUN mkdir -p "${HOME}/.local/bin" \
     && . "${NVM_DIR}/nvm.sh" \
     && npm install -g pnpm @vue/cli @anthropic-ai/claude-code aws-cdk \
+    && npm install -g --ignore-scripts @earendil-works/pi-coding-agent \
     && curl -fsSL https://herdr.dev/install.sh | sh \
     && curl -fsSL https://jcode.sh/install | bash \
     && NODE_BIN_DIR="$(dirname "$(nvm which default)")" \

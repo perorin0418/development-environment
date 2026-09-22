@@ -70,6 +70,11 @@ services:
       - ${WSL_HERDR_CONFIG_HOME}:/home/developer/.config/herdr
       # ~/.local/state/herdr: herdr のエージェント検出状態 (agent-detection/ 配下)
       - ${WSL_HERDR_STATE_HOME}:/home/developer/.local/state/herdr
+      # ~/.pi/agent: pi (AI コーディングハーネス) の設定・認証情報・セッション
+      # (auth.json, settings, sessions, インストール済み pi パッケージ等)。
+      # pi 本体は npm グローバルインストールで別の場所に入るため、この
+      # ディレクトリをマウントしてもコマンドは隠れない。
+      - ${WSL_PI_AGENT_HOME}:/home/developer/.pi/agent
       # ホストの Docker デーモンのソケットをそのままバインドマウントする。
       # これにより、コンテナ内(Docker-in-Docker は行わない)から docker-ce-cli
       # 経由でホスト側(Rancher Desktop)の Docker を直接操作できる。
