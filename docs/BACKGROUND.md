@@ -57,7 +57,7 @@ SSH は鍵配布・パスワード管理・接続不良のトラブルが多く�
 
 `Dockerfile` のツール構成は `wsl2-debian-dev-setup` リポジトリの
 `install-dev-tools.sh` を参考にしている
-(git, Node.js/nvm, pnpm, Vue CLI, Claude Code CLI, herdr, jcode, code-server,
+(git, Node.js/nvm, pnpm, Vue CLI, Claude Code CLI, herdr, code-server,
 ripgrep, jq, gh, Python3+uv, Go, Java, Rust, fzf/fd-find, 日本語ロケール等)。
 
 参考スクリプトから以下は除外した:
@@ -111,7 +111,7 @@ WSL は起動時に、Windows ホスト側の各ドライブを自動的に `/mn
   個別のマウントポイントがネストされたディレクトリである。このディレクトリを
   そのままバインドマウントすると、コンテナ再作成時に Rancher Desktop 側の
   アンマウント処理がネストされたマウントポイントを含むディレクトリを
-  一括アンマウントしようとして失敗し、`start-dev-container.bat` が次の
+  一括アンマウントしようとして失敗し、`start.bat` が次の
   エラーで失敗することがあった:
   ```text
   Error response from daemon: failed to modify the response from the
@@ -119,12 +119,12 @@ WSL は起動時に、Windows ホスト側の各ドライブを自動的に `/mn
   bind mount ...: invalid argument
   ```
 - **対処(現在の方式)**: `scripts/generate-host-drives-compose.sh` が
-  `start-dev-container.bat`/`stop-dev-container.bat` 実行時に WSL Debian 側で
+  `start.bat`/`stop.bat` 実行時に WSL Debian 側で
   自動実行され、`/proc/mounts` から `WSL_HOST_DRIVES_SOURCE`(既定値 `/mnt`)
   配下で実際にマウントされているドライブ(`/mnt/c`, `/mnt/d` 等)を検出し、
   ドライブ1つにつき1行のバインドマウントを定義する
-  `docker/config/compose.host-drives.yaml`(自動生成物。`.gitignore` 対象)を
-  生成する。`start-dev-container.bat`/`stop-dev-container.bat` は
+  `container-general-develop/config/compose.host-drives.yaml`(自動生成物。
+  `.gitignore` 対象)を生成する。`start.bat`/`stop.bat` は
   `docker compose -f compose.yaml -f compose.host-drives.yaml ...` の形で
   この override ファイルを追加読み込みする。ネストマウントを含まない末端の
   ディレクトリ(ドライブ単位)だけをバインドマウントするため、アンマウント時に
@@ -138,20 +138,20 @@ WSL は起動時に、Windows ホスト側の各ドライブを自動的に `/mn
   DrvFS/virtiofs 経由であるため I/O は低速になる。大きなビルド成果物の
   読み書きなど I/O 負荷が高い作業には向かない。Windows 側ファイルをやり取り
   する用途(参照・コピー等)を想定している。
-- `setup-dev-container.sh` の `mkdir -p`/`chown` 対象には含めていない。
+- `setup.sh` の `mkdir -p`/`chown` 対象には含めていない。
   `/mnt` は WSL がシステムとして自動管理する既存のマウントポイントであり、
   ホストの全ドライブに対して再帰的な `chown` を行うのは危険かつ不要なため
   (元々 Windows 側の各ユーザー・ACL で権限管理されている)。
 - 新しいドライブを WSL にマウントし直した場合(例: USB ドライブ接続後)は、
-  `start-dev-container.bat` を再実行すれば `generate-host-drives-compose.sh`
+  `start.bat` を再実行すれば `generate-host-drives-compose.sh`
   が再検出して `compose.host-drives.yaml` を更新する。
 - **ネットワークドライブ(Z: など)について**: WSL は起動時に Windows の
   ローカル/固定ドライブ(C:, D: 等)しか自動マウントせず、Windows でドライブ
   文字にマップしたネットワークドライブ(`net use Z: \\server\share` や
   エクスプローラーの「ネットワークドライブの割り当て」で設定したもの)は
   自動では WSL 側に現れない。ドライブ文字の割り当ては環境ごとに異なるため
-  ハードコーディングできない。そこで `start-dev-container.bat`/
-  `stop-dev-container.bat` は `scripts/mount-network-drives.sh` を
+  ハードコーディングできない。そこで `start.bat`/
+  `stop.bat` は `scripts/mount-network-drives.sh` を
   `wsl.exe -u root`(パスワード不要で root 権限を取得できる)経由で実行し、
   以下の手順で動的にマウントする:
   1. `scripts/list-network-drives.ps1` が Windows 側で
@@ -166,44 +166,3 @@ WSL は起動時に、Windows ホスト側の各ドライブを自動的に `/mn
   - ネットワークドライブが切断されている(VPN 未接続等)場合はマウントに
     失敗するが、致命的エラーにはせず警告を出して続行する(そのドライブは
     コンテナから見えないだけで、他の処理には影響しない)。
-
-## jcode 用コンテキスト圧縮ツール(rtk / lean-ctx)を入れた理由
-
-jcode エージェントがシェルコマンド(`git log`, `cargo test` 等)を実行すると、
-出力全文がそのままコンテキストウィンドウに乗ってしまい、トークンを大量に
-消費する。これを緩和するため、出力を要約・圧縮する2つの CLI をイメージに
-焼き込んでいる。
-
-- **rtk**(Rust Token Killer): `rtk git status` のように明示的にコマンドへ
-  前置して使う圧縮プロキシ。jcode 側に組み込みのフック機構が無いため、
-  自動書き換えはできない(利用は `docker/config/preferred-tools.md` 経由の
-  提案止まり)。
-- **lean-ctx**: シェルの alias 方式フックと MCP サーバー(`ctx_read` 等)の
-  両方を提供する。MCP サーバーとしては `docker/Dockerfile` がビルド時に
-  `$JCODE_HOME/mcp.json` へ登録し、シェルフックとしては `lean-ctx init
-  --global` が生成した `~/.config/lean-ctx/{env.sh,shell-hook.bash}` を
-  ベースに使う。
-
-### なぜ非対話シェル向けの追加ラッパー(jcode-env.sh)が必要か
-
-lean-ctx の標準シェルフックは bash の **alias** で実装されており、
-alias 展開は対話シェルでは既定で有効だが、非対話シェル(`bash -c "..."`)では
-`shopt -s expand_aliases` を明示しない限り無効になる。jcode の `Bash` ツールは
-コマンドをまさにこの `bash -c "..."` の形で実行するため、`~/.bashrc` への
-追記(対話シェル前提)だけでは効かない。
-
-対処として、Dockerfile が `~/.config/lean-ctx/jcode-env.sh` という薄い
-ラッパー(`shopt -s expand_aliases` を立ててから本体の `env.sh` を読み込むだけ)
-を生成し、`compose.yaml` の `BASH_ENV`/`LEAN_CTX_AGENT` 環境変数でこれを
-使わせている。`BASH_ENV` は非対話シェルでのみ読み込まれる変数のため、
-`docker exec -it dev-container bash` で入る対話シェルの挙動には影響しない。
-
-### なぜ `entrypoint.sh` でも mcp.json / preferred-tools.md を補完するか
-
-`$JCODE_HOME`(`~/.jcode-data`)は compose.yaml で永続化用にバインドマウント
-しているため、初回起動時はホスト側の空ディレクトリで隠れてしまう
-(他の `config.toml` 等と同じ問題。上記「1. apt base packages」節や
-`docs/PERSISTENCE.md` 参照)。そのため `entrypoint.sh` が起動のたびに
-「無ければ補完する」形で、lean-ctx の MCP サーバー登録とガイダンス文書
-(`preferred-tools.md`)を復元する。mcp.json は他の MCP サーバー設定を
-壊さないよう `jq` でマージしている。

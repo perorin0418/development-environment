@@ -1,7 +1,7 @@
 # 認証情報・設定の永続化
 
 `docker compose down`(コンテナ削除)や `docker rm` を行うと、コンテナのファイル
-システムは消える。`jcode login` や `gh auth login` などでコンテナ内に入れた
+システムは消える。`claude` や `gh auth login` などでコンテナ内に入れた
 認証情報も一緒に消え、再ログインが必要になる。
 
 これを避けるため、`compose.yaml` は以下のディレクトリ/ファイルを個別に
@@ -11,17 +11,14 @@ WSL Debian 側へバインドマウントする(`~/` 配下を丸ごとマウン
 
 | コンテナ内パス | 内容 | `.env` の変数 |
 | --- | --- | --- |
-| `~/.jcode-data` (`$JCODE_HOME`) | `jcode login` の認証情報 (`auth.json` 等) | `WSL_JCODE_HOME` |
 | `~/.config/gh` | `gh auth login` の認証情報 | `WSL_GH_CONFIG_HOME` |
 | `~/.claude` | Claude Code CLI の認証情報 (`.credentials.json` 等) | `WSL_CLAUDE_HOME` |
 | `~/.ssh` | SSH 鍵 | `WSL_SSH_HOME` |
 | `~/.config/git` | git のユーザー設定(ディレクトリ) | `WSL_GIT_CONFIG_HOME` |
 | `~/.npmrc` | npm の認証・レジストリ設定(ファイル) | `WSL_NPMRC_FILE` |
-| `~/AGENTS.md` | jcode のグローバル指示ファイル(ファイル) | `WSL_AGENTS_MD_FILE` |
 | `~/.aws` | AWS CLI の認証情報・設定(`credentials`, `config` 等) | `WSL_AWS_HOME` |
 | `~/.config/herdr` | herdr の設定・セッション状態(`config.toml`, `session.json` 等) | `WSL_HERDR_CONFIG_HOME` |
 | `~/.local/state/herdr` | herdr のエージェント検出状態(`agent-detection/` 配下) | `WSL_HERDR_STATE_HOME` |
-| `~/.pi/agent` | pi の設定・認証情報・セッション(`auth.json`, sessions, pi パッケージ) | `WSL_PI_AGENT_HOME` |
 
 `~/.config/git` は `~/.gitconfig` をファイル単体でマウントするのではなく
 ディレクトリマウントにしている。`~/.gitconfig` をファイルとしてバインド
@@ -32,43 +29,34 @@ git はグローバル設定として `~/.gitconfig` が無ければ `~/.config/
 を読むため、ディレクトリ側をマウントすることで同じ書き込みパターンでも
 問題が起きないようにしている。
 
-`~/.jcode-data` を `~/.jcode` そのものではなく別ディレクトリにしているのは、
-jcode の実行ファイル本体(`~/.jcode/builds/...`、`~/.local/bin/jcode` から
-シンボリックリンクされている)がイメージビルド時に焼き込まれているため。
-`~/.jcode` を丸ごとバインドマウントすると、その `builds/` がホスト側の空
-ディレクトリで隠れて `jcode: command not found` になる。jcode は認証情報等の
-保存先ディレクトリを `JCODE_HOME` 環境変数で変更できるため、Dockerfile で
-`JCODE_HOME=/home/developer/.jcode-data` を設定し、認証情報だけをこちらに
-分離して永続化している。
-
 ## ホストの全ドライブのマウント
 
 上記の認証情報とは別に、ホストの全ドライブ(Windows の C:, D: 等)は
-`start-dev-container.bat`/`stop-dev-container.bat` 実行時に
+`start.bat`/`stop.bat` 実行時に
 `scripts/generate-host-drives-compose.sh` が `WSL_HOST_DRIVES_SOURCE`
 (既定値 `/mnt`。WSL が自動マウント済み)配下を動的検出し、ドライブごとに
-`docker/config/compose.host-drives.yaml`(自動生成物)へバインドマウント
-定義を生成、コンテナの `/mnt/host-drives` 配下へマウントする。これは
-認証情報の永続化とは目的が異なり(コンテナ削除後もホスト側にデータは
-残り続ける)、`setup-dev-container.sh` の `mkdir`/`chown` 対象にも含めていない。
+`container-general-develop/config/compose.host-drives.yaml`(自動生成物)へ
+バインドマウント定義を生成、コンテナの `/mnt/host-drives` 配下へマウントする。
+これは認証情報の永続化とは目的が異なり(コンテナ削除後もホスト側にデータは
+残り続ける)、`setup.sh` の `mkdir`/`chown` 対象にも含めていない。
 `/mnt` を丸ごとマウントせずドライブ単位にしている理由は
 [BACKGROUND.md](./BACKGROUND.md) 参照。
 
 ## 事前準備
 
-`setup-dev-container.bat`(内部で `setup-dev-container.sh` を実行)が、
+`setup.bat`(内部で `setup.sh` を実行)が、
 上記すべてのディレクトリ/ファイルの作成と、コンテナ内ユーザー(既定 UID/GID
 1000:1000)への所有権の設定を自動的に行う。手動での `mkdir`/`chown` は不要。
 
 マウント元を事前に作成せず所有権も合わせないまま `docker compose up` すると、
 Docker がディレクトリを自動作成するが所有者が `root` になり、コンテナ内から
 書き込めずクラッシュする(詳細は [TROUBLESHOOTING.md](./TROUBLESHOOTING.md))。
-`setup-dev-container.bat` はこれを避けるために存在する。
+`setup.bat` はこれを避けるために存在する。
 
-`.env` のパスを変更した場合は、`setup-dev-container.bat` を再実行すること
+`.env` のパスを変更した場合は、`setup.bat` を再実行すること
 (何度実行しても安全)。
 
-`~/.ssh` に既存の鍵を使いたい場合は、`setup-dev-container.bat` 実行後に
+`~/.ssh` に既存の鍵を使いたい場合は、`setup.bat` 実行後に
 WSL Debian 側の該当フォルダー(`WSL_SSH_HOME` に指定したパス)へホストの
 `~/.ssh/id_ed25519` 等をコピーしておく。パーミッションは `entrypoint.sh` が
 起動のたびに `700`(ディレクトリ)/`600`(秘密鍵)/`644`(`*.pub`)へ強制するため、

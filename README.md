@@ -31,30 +31,26 @@ Rancher Desktop を開き、`Preferences > WSL > Integrations` で `Debian` を�
 
 ## 手順3: 初回セットアップ
 
-`create-dockerfile\docker` フォルダーにある **`setup-dev-container.bat`** を
+`container-general-develop` フォルダーにある **`setup.bat`** を
 ダブルクリックしてください。
 
-これだけで、docker の設定・`.env` の作成・保存用フォルダーの準備が自動的に
+これだけで、コンテナの設定・`.env` の作成・保存用フォルダーの準備が自動的に
 行われます(何を作っているかは [docs/PERSISTENCE.md](./docs/PERSISTENCE.md) 参照)。
 実行中に WSL Debian のパスワード入力を求められることがあります。
 
-> 開発用ファイルを置く場所を変更したい場合は、`docker\config\.env` をテキストエディタで
-> 開いて `WSL_MOUNT_SOURCE` を書き換えてから、もう一度 `setup-dev-container.bat`
-> を実行してください(何度実行しても安全です)。
+> 開発用ファイルを置く場所を変更したい場合は、`container-general-develop\config\.env`
+> をテキストエディタで開いて `WSL_MOUNT_SOURCE` を書き換えてから、もう一度
+> `setup.bat` を実行してください(何度実行しても安全です)。
 
 ## 手順4: 起動
 
-同じフォルダーの **`start-dev-container.bat`** をダブルクリックしてください。
+同じフォルダーの **`start.bat`** をダブルクリックしてください。
 初回はイメージのビルドが走るため数分かかります。
 
 ## 手順5: 接続
 
-同じフォルダーの **`exec-dev-container.bat`** をダブルクリックすると、
+同じフォルダーの **`exec.bat`** をダブルクリックすると、
 コンテナ内のシェルに入れます。
-
-コンテナには GUI ブラウザが無いため、jcode に Claude でログインする際は
-`jcode login` ではなく `jcode-login-claude` を使います
-(詳細は [docs/JCODE_AUTH_LOGIN.md](./docs/JCODE_AUTH_LOGIN.md))。
 
 コンテナ内では `docker` コマンドがそのまま使えます(ホスト側 Rancher Desktop
 の Docker デーモンを操作します。詳細は [docs/BACKGROUND.md](./docs/BACKGROUND.md)
@@ -68,24 +64,23 @@ Rancher Desktop を開き、`Preferences > WSL > Integrations` で `Debian` を�
 
 ---
 
-## よく使う操作(すべて `create-dockerfile\docker` フォルダー内)
+## よく使う操作(すべて `container-general-develop` フォルダー内)
 
 | やりたいこと | ファイル |
 | --- | --- |
-| 起動 | `start-dev-container.bat` |
-| 削除(イメージは残る) | `stop-dev-container.bat` |
-| コンテナに接続 | `exec-dev-container.bat` |
-| `.env` 編集後の再セットアップ | `setup-dev-container.bat` |
+| 起動 | `start.bat` |
+| 削除(イメージは残る) | `stop.bat` |
+| コンテナに接続 | `exec.bat` |
+| `.env` 編集後の再セットアップ | `setup.bat` |
 
 コンテナは `restart: always` の設定により、Rancher Desktop が起動している限り
 自動起動・自動復帰し続けます(異常終了時も再起動されます)。停止したい場合は
-`stop-dev-container.bat` でコンテナごと削除してください。プロジェクトファイルや
-認証情報は WSL Debian 側に永続化されているため、`start-dev-container.bat` で
+`stop.bat` でコンテナごと削除してください。プロジェクトファイルや
+認証情報は WSL Debian 側に永続化されているため、`start.bat` で
 作り直しても失われません(詳細は [docs/PERSISTENCE.md](./docs/PERSISTENCE.md))。
 
 ## さらに詳しく
 
 - [docs/BACKGROUND.md](./docs/BACKGROUND.md): なぜこの構成なのか、設計判断の理由
 - [docs/PERSISTENCE.md](./docs/PERSISTENCE.md): 認証情報・設定を永続化する仕組み
-- [docs/JCODE_AUTH_LOGIN.md](./docs/JCODE_AUTH_LOGIN.md): jcode にブラウザなしでログインする方法
 - [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md): 起動しない/エラーになる場合の対処

@@ -1,2 +1,2 @@
-docker/config/.env
-docker/config/compose.host-drives.yaml
+container-general-develop/config/.env
+container-general-develop/config/compose.host-drives.yaml

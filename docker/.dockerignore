@@ -1,5 +1,0 @@
-config/.env
-config/.env.*
-!config/.env.example
-config/compose.yaml
-README.md
