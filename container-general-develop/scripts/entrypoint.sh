@@ -30,6 +30,26 @@ if [ -d "${HOME}/.ssh" ]; then
     find "${HOME}/.ssh" -maxdepth 1 -type f ! -name '*.pub' -print0 | xargs -0 -r chmod 600
 fi
 
+# --- gh (GitHub CLI) の git credential helper 設定 ---
+# `gh auth login` の認証情報自体は ~/.config/gh(WSL_GH_CONFIG_HOME)に
+# 永続化されるが、それを `git push`/`git pull` で使うための
+# credential.helper 設定は、通常 `gh auth setup-git` を手動実行した際に
+# ~/.gitconfig へ書き込まれる。~/.gitconfig は永続化対象外(~/.config/git
+# のみ永続化している)のため、コンテナ再作成のたびにこの設定が失われ、
+# gh 自体はログイン済みなのに git push/pull だけ認証エラーになる。
+# そのため、ここで ~/.config/git/config(永続化対象)に直接書き込む。
+GIT_CONFIG_PERSIST="${HOME}/.config/git/config"
+if [ -d "${HOME}/.config/gh" ] && command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+    if ! git config --file "${GIT_CONFIG_PERSIST}" --get-all credential.https://github.com.helper 2>/dev/null \
+            | grep -q 'gh auth git-credential'; then
+        log "Configuring gh as git credential helper in ${GIT_CONFIG_PERSIST}"
+        for gh_host in github.com gist.github.com; do
+            git config --file "${GIT_CONFIG_PERSIST}" --replace-all "credential.https://${gh_host}.helper" ""
+            git config --file "${GIT_CONFIG_PERSIST}" --add "credential.https://${gh_host}.helper" "!/usr/bin/gh auth git-credential"
+        done
+    fi
+fi
+
 # --- ホスト Docker ソケット ---
 # compose.yaml で /var/run/docker.sock をバインドマウントしている場合、
 # ソケットの所有 GID はホスト(Rancher Desktop の VM)側の docker グループの
