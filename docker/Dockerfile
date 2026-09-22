@@ -225,6 +225,26 @@ RUN NVIM_ARCH="$(dpkg --print-architecture)" \
     && ln -sf /opt/nvim/bin/nvim /usr/local/bin/nvim
 
 # ---------------------------------------------------------------------------
+# 4e2. fresh (ターミナル向けエディタ/IDE, 公式リリースの tarball)
+# ---------------------------------------------------------------------------
+# Debian の apt には存在しないため、GitHub リリースのビルド済み musl(静的
+# リンク)版 tarball からバイナリだけを取り出して /usr/local/bin に置く。
+# アーカイブ内は <target名>/fresh という構成なので --strip-components=1 で
+# 取り出す。
+RUN FRESH_ARCH="$(dpkg --print-architecture)" \
+    && case "${FRESH_ARCH}" in \
+         amd64) FRESH_TARGET="x86_64-unknown-linux-musl" ;; \
+         arm64) FRESH_TARGET="aarch64-unknown-linux-musl" ;; \
+         *) echo "Unsupported architecture for fresh: ${FRESH_ARCH}" >&2; exit 1 ;; \
+       esac \
+    && curl -fsSL "https://github.com/sinelaw/fresh/releases/latest/download/fresh-editor-${FRESH_TARGET}.tar.gz" \
+        -o /tmp/fresh.tar.gz \
+    && tar -C /usr/local/bin -xzf /tmp/fresh.tar.gz --strip-components=1 \
+        "fresh-editor-${FRESH_TARGET}/fresh" \
+    && chmod +x /usr/local/bin/fresh \
+    && rm -f /tmp/fresh.tar.gz
+
+# ---------------------------------------------------------------------------
 # 4f. rtk (Rust Token Killer) / lean-ctx: jcode エージェント用コンテキスト圧縮CLI
 # ---------------------------------------------------------------------------
 # どちらも「シェルコマンドの出力をLLMに見せる前に圧縮する」CLI。lean-ctx は
