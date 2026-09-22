@@ -63,15 +63,37 @@ fi
 # (Dockerfile 参照)。~/.claude はホスト側にバインドマウントされ内容が
 # 起動ごとに変わり得るため、settings.json の statusLine 設定はここで
 # 毎回マージして最新のイメージ側パスを指すようにする(他のキーは温存する)。
+#
+# ~/.claude はコンテナ起動直後の時点では、ホスト側(WSL)からのバインド
+# マウントがまだ確立しておらず、コンテナ内の空ディレクトリのままである
+# ことがある(Rancher Desktop は WSL ディストロ間の中継マウントを都度
+# 生成するため、確立に遅延が生じ得る)。その状態で settings.json を
+# 書き込むと、後からマウントが確立しても認証情報(.credentials.json 等
+# 本来ホスト側に永続化されているファイル)が隠れて見えなくなる恐れがある
+# ため、~/.claude が実際にバインドマウント済みであることを /proc/mounts
+# で確認できるまで待ってから書き込む。一定時間待っても確立しない場合は
+# 書き込みをスキップする(誤って未マウントの一時領域に書いて、後続の
+# クラッシュ調査を難しくしないため)。
 CLAUDE_SETTINGS="${HOME}/.claude/settings.json"
 if [ -d "${HOME}/.claude" ]; then
-    if [ ! -f "${CLAUDE_SETTINGS}" ]; then
-        echo '{}' > "${CLAUDE_SETTINGS}"
+    CLAUDE_MOUNT_WAIT=0
+    CLAUDE_MOUNT_WAIT_MAX=10
+    while ! grep -q " ${HOME}/.claude " /proc/mounts && [ "${CLAUDE_MOUNT_WAIT}" -lt "${CLAUDE_MOUNT_WAIT_MAX}" ]; do
+        sleep 1
+        CLAUDE_MOUNT_WAIT=$((CLAUDE_MOUNT_WAIT + 1))
+    done
+
+    if grep -q " ${HOME}/.claude " /proc/mounts; then
+        if [ ! -f "${CLAUDE_SETTINGS}" ]; then
+            echo '{}' > "${CLAUDE_SETTINGS}"
+        fi
+        CLAUDE_SETTINGS_TMP="$(mktemp)"
+        jq '.statusLine = {"type": "command", "command": "/opt/statusline.sh"}' \
+            "${CLAUDE_SETTINGS}" > "${CLAUDE_SETTINGS_TMP}"
+        mv "${CLAUDE_SETTINGS_TMP}" "${CLAUDE_SETTINGS}"
+    else
+        log "WARNING: ${HOME}/.claude is not a bind mount after ${CLAUDE_MOUNT_WAIT_MAX}s; skipping statusLine merge"
     fi
-    CLAUDE_SETTINGS_TMP="$(mktemp)"
-    jq '.statusLine = {"type": "command", "command": "/opt/statusline.sh"}' \
-        "${CLAUDE_SETTINGS}" > "${CLAUDE_SETTINGS_TMP}"
-    mv "${CLAUDE_SETTINGS_TMP}" "${CLAUDE_SETTINGS}"
 fi
 
 # --- herdr ---
