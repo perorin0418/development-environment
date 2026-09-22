@@ -299,6 +299,35 @@ RUN { \
     } >> "${HOME}/.bashrc"
 
 # ---------------------------------------------------------------------------
+# 7d. Claude Code permissions: defaultMode を plan に固定 + 自己防衛
+# ---------------------------------------------------------------------------
+# コンテナ内で作業する Claude Code 自身が、ユーザーの明示承認なしに
+# 変更を実行してしまう事故を防ぐため、settings.json の
+# permissions.defaultMode を "plan"(実装前に必ずユーザー承認を要求する
+# モード)に固定する。あわせて、エージェントが Edit/Write ツールで
+# この設定自体を書き換えて自己解除することを防ぐため、settings.json
+# 自身への Edit/Write を permissions.deny に登録する。
+# (Bash 経由でのファイル書き換えまでは防げない。あくまで Edit/Write
+# ツール経由の変更に対する抑止であることに注意。)
+#
+# 書き込みタイミング・場所の理由は 7c と同じ(entrypoint.sh 実行時点では
+# ホスト側バインドマウントが未確立のことがあるため、対話シェル起動時の
+# ~/.bashrc で行う)。
+RUN { \
+        echo ''; \
+        echo '# Claude Code permissions: defaultMode を plan に固定し、'; \
+        echo '# settings.json 自身への Edit/Write を deny する(理由は Dockerfile 7d 参照)。'; \
+        echo 'if [ -d "${HOME}/.claude" ]; then'; \
+        echo '    __claude_settings="${HOME}/.claude/settings.json"'; \
+        echo '    [ -f "${__claude_settings}" ] || echo '"'"'{}'"'"' > "${__claude_settings}"'; \
+        echo '    __claude_settings_tmp="$(mktemp)"'; \
+        echo '    jq '"'"'.permissions.defaultMode = "plan" | .permissions.deny = (((.permissions.deny // []) + ["Edit(~/.claude/settings.json)", "Write(~/.claude/settings.json)"]) | unique)'"'"' "${__claude_settings}" > "${__claude_settings_tmp}" \'; \
+        echo '        && mv "${__claude_settings_tmp}" "${__claude_settings}"'; \
+        echo '    unset __claude_settings __claude_settings_tmp'; \
+        echo 'fi'; \
+    } >> "${HOME}/.bashrc"
+
+# ---------------------------------------------------------------------------
 # 11. 便利コマンドのシンボリックリンク (Debian の fd-find は fdfind という名前になる)
 # ---------------------------------------------------------------------------
 RUN mkdir -p "${HOME}/.local/bin" \
