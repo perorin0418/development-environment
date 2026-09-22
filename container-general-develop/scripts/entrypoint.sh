@@ -58,6 +58,22 @@ if [ -S "${DOCKER_SOCK}" ]; then
     fi
 fi
 
+# --- Claude Code statusline ---
+# statusline スクリプト本体はイメージの /opt/statusline.sh に焼き込み済み
+# (Dockerfile 参照)。~/.claude はホスト側にバインドマウントされ内容が
+# 起動ごとに変わり得るため、settings.json の statusLine 設定はここで
+# 毎回マージして最新のイメージ側パスを指すようにする(他のキーは温存する)。
+CLAUDE_SETTINGS="${HOME}/.claude/settings.json"
+if [ -d "${HOME}/.claude" ]; then
+    if [ ! -f "${CLAUDE_SETTINGS}" ]; then
+        echo '{}' > "${CLAUDE_SETTINGS}"
+    fi
+    CLAUDE_SETTINGS_TMP="$(mktemp)"
+    jq '.statusLine = {"type": "command", "command": "/opt/statusline.sh"}' \
+        "${CLAUDE_SETTINGS}" > "${CLAUDE_SETTINGS_TMP}"
+    mv "${CLAUDE_SETTINGS_TMP}" "${CLAUDE_SETTINGS}"
+fi
+
 # --- herdr ---
 # SHELL は Dockerfile の ENV で /bin/bash に固定済み(herdr が pane 生成時の
 # デフォルトシェルとして readline 非対応の /bin/sh(dash) にフォールバックし、
