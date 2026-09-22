@@ -49,6 +49,17 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # ~/.jcode(builds 本体)はイメージに焼き込んだままにする。
 ENV JCODE_HOME=/home/${USERNAME}/.jcode-data
 
+# jcode は bash ツールに TMPDIR / JCODE_SCRATCH_DIR として既定で
+# $JCODE_HOME/scratch を設定し、エージェントに「大きな一時ファイルは /tmp では
+# なくここに置け」と指示する。しかし JCODE_HOME は永続化ボリュームのバインド
+# マウント先なので、既定のままだと cdk synth の出力・ビルド成果物・puppeteer の
+# プロファイル等の使い捨てデータがホスト側に永久に溜まり続ける(実際に 1.8GB
+# 蓄積した)。コンテナ寿命と一致する場所へ明示的に退避させる。
+# /tmp ではなく /var/tmp なのは、/tmp が RAM-backed の場合に大きな成果物で
+# メモリを食い潰すため(jcode 自身も /tmp を避けるよう指示している)。
+# JCODE_SCRATCH_DIR を設定すると jcode が TMPDIR も同じ値に揃える。
+ENV JCODE_SCRATCH_DIR=/var/tmp/jcode-scratch
+
 # nvm/rustup/uv のインストーラースクリプトは bash 依存(dash非互換)のため、
 # 以降の RUN は bash で実行する。
 SHELL ["/bin/bash", "-c"]
