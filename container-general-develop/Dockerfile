@@ -293,7 +293,7 @@ RUN { \
         echo '    [ -f "${__claude_settings}" ] || echo '"'"'{}'"'"' > "${__claude_settings}"'; \
         echo '    __claude_settings_tmp="$(mktemp)"'; \
         echo '    jq '"'"'.statusLine = {"type": "command", "command": "/opt/statusline.sh"}'"'"' "${__claude_settings}" > "${__claude_settings_tmp}" \'; \
-        echo '        && mv "${__claude_settings_tmp}" "${__claude_settings}"'; \
+        echo '        && cat "${__claude_settings_tmp}" > "${__claude_settings}" && rm -f "${__claude_settings_tmp}"'; \
         echo '    unset __claude_settings __claude_settings_tmp'; \
         echo 'fi'; \
     } >> "${HOME}/.bashrc"
@@ -304,11 +304,18 @@ RUN { \
 # コンテナ内で作業する Claude Code 自身が、ユーザーの明示承認なしに
 # 変更を実行してしまう事故を防ぐため、settings.json の
 # permissions.defaultMode を "plan"(実装前に必ずユーザー承認を要求する
-# モード)に固定する。あわせて、エージェントが Edit/Write ツールで
-# この設定自体を書き換えて自己解除することを防ぐため、settings.json
-# 自身への Edit/Write を permissions.deny に登録する。
-# (Bash 経由でのファイル書き換えまでは防げない。あくまで Edit/Write
+# モード)に固定する。あわせて、エージェントがこの設定自体を書き換えて
+# 自己解除することを防ぐため、settings.json 自身への Edit を
+# permissions.deny に登録する(Write(path) はファイル権限チェックの
+# 対象外で無効なため deny には含めない。Edit(path) が Write を含む
+# 全ファイル編集ツールをカバーする、という Claude Code 本体の仕様による)。
+# (Bash 経由でのファイル書き換えまでは防げない。あくまで Edit 系
 # ツール経由の変更に対する抑止であることに注意。)
+#
+# jq 式は deny リストから旧版が誤って追加した無効な
+# "Write(~/.claude/settings.json)" を除去してから Edit を追加している。
+# これにより、既にこのエントリが書き込まれてしまった環境でも
+# 次回対話シェル起動時に自己修復される。
 #
 # 書き込みタイミング・場所の理由は 7c と同じ(entrypoint.sh 実行時点では
 # ホスト側バインドマウントが未確立のことがあるため、対話シェル起動時の
@@ -316,13 +323,13 @@ RUN { \
 RUN { \
         echo ''; \
         echo '# Claude Code permissions: defaultMode を plan に固定し、'; \
-        echo '# settings.json 自身への Edit/Write を deny する(理由は Dockerfile 7d 参照)。'; \
+        echo '# settings.json 自身への Edit を deny する(理由は Dockerfile 7d 参照)。'; \
         echo 'if [ -d "${HOME}/.claude" ]; then'; \
         echo '    __claude_settings="${HOME}/.claude/settings.json"'; \
         echo '    [ -f "${__claude_settings}" ] || echo '"'"'{}'"'"' > "${__claude_settings}"'; \
         echo '    __claude_settings_tmp="$(mktemp)"'; \
-        echo '    jq '"'"'.permissions.defaultMode = "plan" | .permissions.deny = (((.permissions.deny // []) + ["Edit(~/.claude/settings.json)", "Write(~/.claude/settings.json)"]) | unique)'"'"' "${__claude_settings}" > "${__claude_settings_tmp}" \'; \
-        echo '        && mv "${__claude_settings_tmp}" "${__claude_settings}"'; \
+        echo '    jq '"'"'.permissions.defaultMode = "plan" | .permissions.deny = ((((.permissions.deny // []) - ["Write(~/.claude/settings.json)"]) + ["Edit(~/.claude/settings.json)"]) | unique)'"'"' "${__claude_settings}" > "${__claude_settings_tmp}" \'; \
+        echo '        && cat "${__claude_settings_tmp}" > "${__claude_settings}" && rm -f "${__claude_settings_tmp}"'; \
         echo '    unset __claude_settings __claude_settings_tmp'; \
         echo 'fi'; \
     } >> "${HOME}/.bashrc"
