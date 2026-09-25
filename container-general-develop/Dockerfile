@@ -283,19 +283,41 @@ RUN { \
 # `docker exec -it` で入る対話シェルの時点ではコンテナは起動完了済みで
 # あり、マウントも確立している(alias claude 経由での headroom 起動が
 # 機能している = ~/.bashrc が読み込まれていることの裏付けでもある)。
+#
+# settings.json が存在しない、または JSON オブジェクトとして解釈できない
+# (空ファイル・構文エラー等)場合は、jq が失敗してマージが行われないため、
+# 元ファイルを settings.json.broken.<日時> に退避したうえで {} に初期化する
+# (7d も同様)。判定に `jq -e` を使わないのは、Debian の jq 1.6 では入力が
+# 空(出力なし)でも `-e` の終了コードが 0 になり、空ファイルを検出できない
+# ため(jq 1.7 で修正済み)。`jq -r type` の出力が "object" かどうかで判定する。
+#
+# また、herdr はコンテナ起動時にセッション内の複数ペインの bash を同時に
+# 起動するため、各 ~/.bashrc が settings.json を同時に読み書きすると、
+# 他のシェルが切り詰め中の空ファイルを読んで空の結果を書き戻し、
+# settings.json が空になる競合が起きる。これを防ぐため flock で排他し、
+# 加えて jq の出力が空の場合は書き戻さない。
 COPY --chmod=0755 scripts/statusline.sh /opt/statusline.sh
 RUN { \
         echo ''; \
         echo '# Claude Code statusline: settings.json の statusLine 設定を'; \
         echo '# 対話シェル起動時にマージする(理由は Dockerfile 7c 参照)。'; \
-        echo 'if [ -d "${HOME}/.claude" ]; then'; \
+        echo 'if [ -d "${HOME}/.claude" ]; then {'; \
+        echo '    flock 9'; \
         echo '    __claude_settings="${HOME}/.claude/settings.json"'; \
-        echo '    [ -f "${__claude_settings}" ] || echo '"'"'{}'"'"' > "${__claude_settings}"'; \
+        echo '    if [ "$(jq -r type "${__claude_settings}" 2>/dev/null)" != "object" ]; then'; \
+        echo '        if [ -e "${__claude_settings}" ]; then'; \
+        echo '            __claude_settings_bak="${__claude_settings}.broken.$(date +%Y%m%d%H%M%S)"'; \
+        echo '            cp "${__claude_settings}" "${__claude_settings_bak}"'; \
+        echo '            echo "WARN: ${__claude_settings} が不正な JSON のため ${__claude_settings_bak} に退避して初期化しました" >&2'; \
+        echo '        fi'; \
+        echo '        echo '"'"'{}'"'"' > "${__claude_settings}"'; \
+        echo '    fi'; \
         echo '    __claude_settings_tmp="$(mktemp)"'; \
         echo '    jq '"'"'.statusLine = {"type": "command", "command": "/opt/statusline.sh"}'"'"' "${__claude_settings}" > "${__claude_settings_tmp}" \'; \
-        echo '        && cat "${__claude_settings_tmp}" > "${__claude_settings}" && rm -f "${__claude_settings_tmp}"'; \
-        echo '    unset __claude_settings __claude_settings_tmp'; \
-        echo 'fi'; \
+        echo '        && [ -s "${__claude_settings_tmp}" ] && cat "${__claude_settings_tmp}" > "${__claude_settings}"'; \
+        echo '    rm -f "${__claude_settings_tmp}"'; \
+        echo '    unset __claude_settings __claude_settings_tmp __claude_settings_bak'; \
+        echo '} 9>/tmp/.claude-settings.lock; fi'; \
     } >> "${HOME}/.bashrc"
 
 # ---------------------------------------------------------------------------
@@ -324,14 +346,23 @@ RUN { \
         echo ''; \
         echo '# Claude Code permissions: defaultMode を plan に固定し、'; \
         echo '# settings.json 自身への Edit を deny する(理由は Dockerfile 7d 参照)。'; \
-        echo 'if [ -d "${HOME}/.claude" ]; then'; \
+        echo 'if [ -d "${HOME}/.claude" ]; then {'; \
+        echo '    flock 9'; \
         echo '    __claude_settings="${HOME}/.claude/settings.json"'; \
-        echo '    [ -f "${__claude_settings}" ] || echo '"'"'{}'"'"' > "${__claude_settings}"'; \
+        echo '    if [ "$(jq -r type "${__claude_settings}" 2>/dev/null)" != "object" ]; then'; \
+        echo '        if [ -e "${__claude_settings}" ]; then'; \
+        echo '            __claude_settings_bak="${__claude_settings}.broken.$(date +%Y%m%d%H%M%S)"'; \
+        echo '            cp "${__claude_settings}" "${__claude_settings_bak}"'; \
+        echo '            echo "WARN: ${__claude_settings} が不正な JSON のため ${__claude_settings_bak} に退避して初期化しました" >&2'; \
+        echo '        fi'; \
+        echo '        echo '"'"'{}'"'"' > "${__claude_settings}"'; \
+        echo '    fi'; \
         echo '    __claude_settings_tmp="$(mktemp)"'; \
         echo '    jq '"'"'.permissions.defaultMode = "plan" | .permissions.deny = ((((.permissions.deny // []) - ["Write(~/.claude/settings.json)"]) + ["Edit(~/.claude/settings.json)"]) | unique)'"'"' "${__claude_settings}" > "${__claude_settings_tmp}" \'; \
-        echo '        && cat "${__claude_settings_tmp}" > "${__claude_settings}" && rm -f "${__claude_settings_tmp}"'; \
-        echo '    unset __claude_settings __claude_settings_tmp'; \
-        echo 'fi'; \
+        echo '        && [ -s "${__claude_settings_tmp}" ] && cat "${__claude_settings_tmp}" > "${__claude_settings}"'; \
+        echo '    rm -f "${__claude_settings_tmp}"'; \
+        echo '    unset __claude_settings __claude_settings_tmp __claude_settings_bak'; \
+        echo '} 9>/tmp/.claude-settings.lock; fi'; \
     } >> "${HOME}/.bashrc"
 
 # ---------------------------------------------------------------------------
