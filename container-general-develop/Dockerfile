@@ -366,6 +366,42 @@ RUN { \
     } >> "${HOME}/.bashrc"
 
 # ---------------------------------------------------------------------------
+# 7e. Claude Code plugins: i-have-adhd / genshijin を有効化
+# ---------------------------------------------------------------------------
+# プラグイン本体は ~/.claude/plugins/ (WSL 側にバインドマウント)に残るが、
+# 有効/無効は settings.json の enabledPlugins で決まる。settings.json が
+# 空・破損で {} に初期化されると(7c 参照)enabledPlugins も消え、
+# プラグインが読み込まれなくなる。そのため、マーケットプレイス定義
+# (extraKnownMarketplaces)と enabledPlugins を毎回マージして固定する。
+# 宣言的な設定のため、未インストールの環境でも Claude Code 起動時に
+# マーケットプレイスの追加とプラグインのインストールが行われる。
+# 既存の他のキー・他プラグインの設定は保持する。手動で無効化しても
+# 次回対話シェル起動時に有効へ戻る点に注意(7d の plan 固定と同じ方針)。
+#
+# 書き込みタイミング・場所の理由は 7c と同じ。
+RUN { \
+        echo ''; \
+        echo '# Claude Code plugins: i-have-adhd / genshijin を有効化する(理由は Dockerfile 7e 参照)。'; \
+        echo 'if [ -d "${HOME}/.claude" ]; then {'; \
+        echo '    flock 9'; \
+        echo '    __claude_settings="${HOME}/.claude/settings.json"'; \
+        echo '    if [ "$(jq -r type "${__claude_settings}" 2>/dev/null)" != "object" ]; then'; \
+        echo '        if [ -e "${__claude_settings}" ]; then'; \
+        echo '            __claude_settings_bak="${__claude_settings}.broken.$(date +%Y%m%d%H%M%S)"'; \
+        echo '            cp "${__claude_settings}" "${__claude_settings_bak}"'; \
+        echo '            echo "WARN: ${__claude_settings} が不正な JSON のため ${__claude_settings_bak} に退避して初期化しました" >&2'; \
+        echo '        fi'; \
+        echo '        echo '"'"'{}'"'"' > "${__claude_settings}"'; \
+        echo '    fi'; \
+        echo '    __claude_settings_tmp="$(mktemp)"'; \
+        echo '    jq '"'"'.extraKnownMarketplaces = ((.extraKnownMarketplaces // {}) + {"i-have-adhd": {"source": {"source": "github", "repo": "ayghri/i-have-adhd"}}, "genshijin": {"source": {"source": "github", "repo": "InterfaceX-co-jp/genshijin"}}}) | .enabledPlugins = ((.enabledPlugins // {}) + {"i-have-adhd@i-have-adhd": true, "genshijin@genshijin": true})'"'"' "${__claude_settings}" > "${__claude_settings_tmp}" \'; \
+        echo '        && [ -s "${__claude_settings_tmp}" ] && cat "${__claude_settings_tmp}" > "${__claude_settings}"'; \
+        echo '    rm -f "${__claude_settings_tmp}"'; \
+        echo '    unset __claude_settings __claude_settings_tmp __claude_settings_bak'; \
+        echo '} 9>/tmp/.claude-settings.lock; fi'; \
+    } >> "${HOME}/.bashrc"
+
+# ---------------------------------------------------------------------------
 # 11. 便利コマンドのシンボリックリンク (Debian の fd-find は fdfind という名前になる)
 # ---------------------------------------------------------------------------
 RUN mkdir -p "${HOME}/.local/bin" \
